@@ -22,3 +22,11 @@
       <br>
       <em>Diseñador UX/UI</em>
     </td>
+<td align="center">
+      <img src="https://github.com/user-attachments/assets/270828c4-40a5-4b45-849d-018b9dfcff27" width="180" alt="Foto de Santiago Riofrío">
+      <br>
+      <strong>Raul Medina/strong>
+      <br>
+      <em>Backend Developer</em>
+    </td>
+  </tr>
