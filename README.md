@@ -13,21 +13,18 @@
       <br>
       <strong>Iam Estrella</strong>
       <br>
-      <em>Backend Developer</em>
     </td>
     <td align="center">
       <img src="https://github.com/user-attachments/assets/15c96ff8-cb25-406e-9666-57cd3c0c58fa" width="150" alt="Foto de Jean Vásquez">
       <br>
       <strong>Jean Vásquez</strong>
       <br>
-      <em>Diseñador UX/UI</em>
     </td>
     <td align="center">
       <img src="https://github.com/user-attachments/assets/71adca89-9442-41d8-b25f-a6693f1a08bf" width="180" alt="Foto de Santiago Riofrío">
       <br>
       <strong>Raul Medina</strong>
       <br>
-      <em>Backend Developer</em>
     </td>
   </tr>
 </table>
