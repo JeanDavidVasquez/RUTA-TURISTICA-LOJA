@@ -221,6 +221,14 @@ class _PerfilState extends State<Perfil> {
               ),
               const SizedBox(height: 16),
               _buildMenuButton(
+                icon: Icons.rate_review_outlined,
+                text: "Mis Reseñas",
+                onTap: () {
+                   Navigator.pushNamed(context, '/mis_resenas');
+                },
+              ),
+              const SizedBox(height: 16),
+              _buildMenuButton(
                 icon: Icons.logout,
                 text: "Cerrar sesión",
                 textColor: Colors.red,

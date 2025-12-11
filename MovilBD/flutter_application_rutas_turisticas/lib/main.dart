@@ -4,6 +4,7 @@ import 'package:flutter_application_rutas_turisticas/screens/main_layout.dart';
 import 'package:flutter_application_rutas_turisticas/screens/register.dart';
 import 'package:flutter_application_rutas_turisticas/screens/splash.dart';
 import 'package:flutter_application_rutas_turisticas/screens/test_connection_screen.dart';
+import 'package:flutter_application_rutas_turisticas/screens/mis_resenas.dart';
 
 void main() {
   runApp(const MyApp());
@@ -65,6 +66,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const Register(),
         '/main': (context) => const MainLayout(),
+        '/mis_resenas': (context) => const MisResenasScreen(),
         //'/test_connection': (context) => const TestConnectionScreen(),
       },
     );

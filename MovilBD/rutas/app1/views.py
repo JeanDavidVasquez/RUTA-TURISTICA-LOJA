@@ -1,20 +1,12 @@
 from django.shortcuts import render
 from rest_framework import viewsets
+from .models import *
+from .serializers import *
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth.hashers import check_password
-from .models import (
-    Usuario, Resena, Categoria, Lugar, 
-    Favorito, Evento, Ruta, Ruta_Guardada, Ruta_Lugar
-)
-from .serializers import (
-    UsuarioSerializer, ResenaSerializer, CategoriaSerializer, LugarSerializer, 
-    FavoritoSerializer, EventoSerializer, RutaSerializer, 
-    Ruta_GuardadaSerializer, Ruta_LugarSerializer
-)
-
-# Un ViewSet define la lógica para un conjunto de endpoints de API
-# ModelViewSet nos da TODA la funcionalidad CRUD por defecto.
+from django.http import JsonResponse
+from django.db.models import Count
 
 class UsuarioViewSet(viewsets.ModelViewSet):
     """
@@ -80,6 +72,21 @@ class ResenaViewSet(viewsets.ModelViewSet):
     """
     queryset = Resena.objects.all().order_by('-fechaCreacion')
     serializer_class = ResenaSerializer
+
+    def get_queryset(self):
+        queryset = Resena.objects.all().order_by('-fechaCreacion')
+        lugar_id = self.request.query_params.get('lugar')
+        ruta_id = self.request.query_params.get('ruta')
+        usuario_id = self.request.query_params.get('usuario')
+
+        if lugar_id:
+            queryset = queryset.filter(lugar__id=lugar_id)
+        if ruta_id:
+            queryset = queryset.filter(ruta__id=ruta_id)
+        if usuario_id:
+            queryset = queryset.filter(usuario__id=usuario_id)
+            
+        return queryset
 
 class FavoritoViewSet(viewsets.ModelViewSet):
     """
@@ -157,3 +164,14 @@ class Ruta_LugarViewSet(viewsets.ModelViewSet):
         if ruta_id is not None:
             queryset = queryset.filter(ruta__id=ruta_id).order_by('orden')
         return queryset
+
+# --- AJAX VIEWS FOR ADMIN ---
+def load_cantones(request):
+    provincia_id = request.GET.get('provincia')
+    cantones = Canton.objects.filter(provincia_id=provincia_id).order_by('nombre')
+    return JsonResponse(list(cantones.values('id', 'nombre')), safe=False)
+
+def load_parroquias(request):
+    canton_id = request.GET.get('canton')
+    parroquias = Parroquia.objects.filter(canton_id=canton_id).order_by('nombre')
+    return JsonResponse(list(parroquias.values('id', 'nombre')), safe=False)

@@ -17,4 +17,7 @@ router.register(r'ruta-lugares', views.Ruta_LugarViewSet, basename='rutalugar')
 
 urlpatterns = [
     path('', include(router.urls)),
+    
+    path('ajax/load-cantones/', views.load_cantones, name='ajax_load_cantones'),
+    path('ajax/load-parroquias/', views.load_parroquias, name='ajax_load_parroquias'),
 ]

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart'; // Para kIsWeb
 import 'package:http/http.dart' as http;
 import '../models/ruta.dart';
 import '../models/lugar.dart';
@@ -7,10 +8,22 @@ import '../models/usuario.dart';
 import '../models/categoria.dart';
 
 class ApiService {
-  // 10.0.2.2 es la IP del host (tu PC) desde el emulador de Android.
-  // Si usas dispositivo físico, usa tu IP local (ej: 192.168.1.X).
-  static const String baseUrl = 'http://10.0.2.2:8000/api';
-  
+  // Configuracion de URL Base
+  // Para Web (Chrome): Usamos localhost
+  // Para Android Emulador: Usamos 10.0.2.2
+  // Para Dispositivo Físico: Usar IP local de tu PC (ej: 192.168.1.X) ('ipconfig' en terminal)
+
+  String get baseUrl {
+    if (kIsWeb) {
+      return 'http://127.0.0.1:8000/api';
+    }
+    // emulador Android:
+    return 'http://10.0.2.2:8000/api';
+
+    // DISPOSITIVO FÍSICO:
+    // return 'http://192.168.1.105:8000/api';
+  }
+
   // Almacenamiento simple del ID de usuario en memoria (se pierde al reiniciar app)
   // En producción usar SharedPreferences o SecureStorage
   static int? currentUserId;
@@ -20,7 +33,9 @@ class ApiService {
 
     if (response.statusCode == 200) {
       List<dynamic> body = jsonDecode(response.body);
-      List<Ruta> rutas = body.map((dynamic item) => Ruta.fromJson(item)).toList();
+      List<Ruta> rutas = body
+          .map((dynamic item) => Ruta.fromJson(item))
+          .toList();
       return rutas;
     } else {
       throw Exception('Failed to load rutas: ${response.statusCode}');
@@ -32,10 +47,22 @@ class ApiService {
 
     if (response.statusCode == 200) {
       List<dynamic> body = jsonDecode(response.body);
-      List<Lugar> lugares = body.map((dynamic item) => Lugar.fromJson(item)).toList();
+      List<Lugar> lugares = body
+          .map((dynamic item) => Lugar.fromJson(item))
+          .toList();
       return lugares;
     } else {
       throw Exception('Failed to load lugares: ${response.statusCode}');
+    }
+  }
+
+  Future<Lugar> getLugar(int id) async {
+    final response = await http.get(Uri.parse('$baseUrl/lugares/$id/'));
+
+    if (response.statusCode == 200) {
+      return Lugar.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load lugar: ${response.statusCode}');
     }
   }
 
@@ -44,7 +71,9 @@ class ApiService {
 
     if (response.statusCode == 200) {
       List<dynamic> body = jsonDecode(response.body);
-      List<Categoria> categorias = body.map((dynamic item) => Categoria.fromJson(item)).toList();
+      List<Categoria> categorias = body
+          .map((dynamic item) => Categoria.fromJson(item))
+          .toList();
       return categorias;
     } else {
       throw Exception('Failed to load categorias: ${response.statusCode}');
@@ -52,11 +81,15 @@ class ApiService {
   }
 
   Future<List<RutaLugar>> fetchRutaLugares(int rutaId) async {
-    final response = await http.get(Uri.parse('$baseUrl/ruta-lugares/?ruta=$rutaId'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/ruta-lugares/?ruta=$rutaId'),
+    );
 
     if (response.statusCode == 200) {
       List<dynamic> body = jsonDecode(response.body);
-      List<RutaLugar> rutaLugares = body.map((dynamic item) => RutaLugar.fromJson(item)).toList();
+      List<RutaLugar> rutaLugares = body
+          .map((dynamic item) => RutaLugar.fromJson(item))
+          .toList();
       return rutaLugares;
     } else {
       throw Exception('Failed to load ruta lugares: ${response.statusCode}');
@@ -76,10 +109,12 @@ class ApiService {
   Future<Map<String, dynamic>> login(String email, String password) async {
     print("ApiService: Login called for $email");
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/usuarios/login/'),
-        body: {'email': email, 'password': password},
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/usuarios/login/'),
+            body: {'email': email, 'password': password},
+          )
+          .timeout(const Duration(seconds: 10));
       print("ApiService: Response received ${response.statusCode}");
       print("ApiService: Body ${response.body}");
 
@@ -102,7 +137,11 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> register(String username, String email, String password) async {
+  Future<Map<String, dynamic>> register(
+    String username,
+    String email,
+    String password,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/usuarios/'),
       body: {
@@ -137,20 +176,23 @@ class ApiService {
             'usuario': currentUserId,
             'lugar': lugarId,
             'tipo': tipo,
-            'fecha': DateTime.now().toIso8601String(), // Añadir fecha por si acaso
+            'fecha': DateTime.now()
+                .toIso8601String(), // Añadir fecha por si acaso
           }),
         );
-        
+
         if (response.statusCode != 201) {
-           throw Exception("Error creating favorite: ${response.body}");
+          throw Exception("Error creating favorite: ${response.body}");
         }
       }
     } else {
       // Si queremos desactivarlo y existe, lo borramos
       if (existing != null) {
-        final response = await http.delete(Uri.parse('$baseUrl/favoritos/${existing['id']}/'));
+        final response = await http.delete(
+          Uri.parse('$baseUrl/favoritos/${existing['id']}/'),
+        );
         if (response.statusCode != 204) {
-           throw Exception("Error deleting favorite: ${response.body}");
+          throw Exception("Error deleting favorite: ${response.body}");
         }
       }
     }
@@ -158,10 +200,12 @@ class ApiService {
 
   Future<Map<String, dynamic>?> _findFavorito(int lugarId, String tipo) async {
     if (currentUserId == null) return null;
-    
+
     // Filtramos por usuario, lugar y tipo
     final response = await http.get(
-      Uri.parse('$baseUrl/favoritos/?usuario=$currentUserId&lugar=$lugarId&tipo=$tipo'),
+      Uri.parse(
+        '$baseUrl/favoritos/?usuario=$currentUserId&lugar=$lugarId&tipo=$tipo',
+      ),
     );
 
     if (response.statusCode == 200) {
@@ -175,7 +219,8 @@ class ApiService {
 
   // Obtiene el estado de las 3 listas para un lugar
   Future<Map<String, bool>> checkFavoritoStatus(int lugarId) async {
-    if (currentUserId == null) return {'FAV': false, 'PEND': false, 'VISIT': false};
+    if (currentUserId == null)
+      return {'FAV': false, 'PEND': false, 'VISIT': false};
 
     final response = await http.get(
       Uri.parse('$baseUrl/favoritos/?usuario=$currentUserId&lugar=$lugarId'),
@@ -209,15 +254,18 @@ class ApiService {
       }
 
       List<dynamic> favsData = jsonDecode(responseFavs.body);
-      Set<int> lugarIds = favsData.map((f) {
-        // Manejar si 'lugar' es un objeto o un ID
-        if (f['lugar'] is int) {
-          return f['lugar'] as int;
-        } else if (f['lugar'] is Map) {
-          return f['lugar']['id'] as int;
-        }
-        return -1; // Fallback
-      }).where((id) => id != -1).toSet();
+      Set<int> lugarIds = favsData
+          .map((f) {
+            // Manejar si 'lugar' es un objeto o un ID
+            if (f['lugar'] is int) {
+              return f['lugar'] as int;
+            } else if (f['lugar'] is Map) {
+              return f['lugar']['id'] as int;
+            }
+            return -1; // Fallback
+          })
+          .where((id) => id != -1)
+          .toSet();
 
       if (lugarIds.isEmpty) return [];
 
@@ -225,7 +273,7 @@ class ApiService {
       // Por ahora traemos todos y filtramos en memoria.
       // Optimización futura: Endpoint que reciba lista de IDs o filtro en backend.
       final allLugares = await fetchLugares();
-      
+
       return allLugares.where((l) => lugarIds.contains(l.id)).toList();
     } catch (e) {
       print("Error fetching user favorites: $e");
@@ -256,16 +304,20 @@ class ApiService {
     } else {
       // Borrar
       if (existing != null) {
-        await http.delete(Uri.parse('$baseUrl/rutas-guardadas/${existing['id']}/'));
+        await http.delete(
+          Uri.parse('$baseUrl/rutas-guardadas/${existing['id']}/'),
+        );
       }
     }
   }
 
   Future<Map<String, dynamic>?> _findRutaGuardada(int rutaId) async {
     if (currentUserId == null) return null;
-    
+
     final response = await http.get(
-      Uri.parse('$baseUrl/rutas-guardadas/?usuario=$currentUserId&ruta=$rutaId'),
+      Uri.parse(
+        '$baseUrl/rutas-guardadas/?usuario=$currentUserId&ruta=$rutaId',
+      ),
     );
 
     if (response.statusCode == 200) {
@@ -351,7 +403,13 @@ class ApiService {
 
   // --- GESTIÓN DE LUGARES EN RUTA ---
 
-  Future<RutaLugar> addLugarToRuta(int rutaId, int lugarId, int orden) async {
+  Future<RutaLugar> addLugarToRuta(
+    int rutaId,
+    int lugarId,
+    int orden, {
+    int tiempoSugerido = 0,
+    String? comentario,
+  }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/ruta-lugares/'),
       headers: {'Content-Type': 'application/json'},
@@ -359,6 +417,8 @@ class ApiService {
         'ruta': rutaId,
         'lugar': lugarId,
         'orden': orden,
+        'tiempo_sugerido_minutos': tiempoSugerido,
+        'comentario': comentario,
         'fechaGuardado': DateTime.now().toIso8601String(),
       }),
     );
@@ -371,7 +431,9 @@ class ApiService {
   }
 
   Future<void> removeLugarFromRuta(int rutaLugarId) async {
-    final response = await http.delete(Uri.parse('$baseUrl/ruta-lugares/$rutaLugarId/'));
+    final response = await http.delete(
+      Uri.parse('$baseUrl/ruta-lugares/$rutaLugarId/'),
+    );
 
     if (response.statusCode != 204) {
       throw Exception('Failed to remove lugar from ruta: ${response.body}');
@@ -379,7 +441,9 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getUserStats(int userId) async {
-    final response = await http.get(Uri.parse('$baseUrl/usuarios/$userId/stats/'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/usuarios/$userId/stats/'),
+    );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -398,6 +462,69 @@ class ApiService {
       return Usuario.fromJson(jsonDecode(response.body));
     } else {
       throw Exception('Failed to update profile: ${response.body}');
+    }
+  }
+
+  // --- RESEÑAS ---
+  Future<List<dynamic>> getReviews(int targetId, String type) async {
+    // type: 'lugar' or 'ruta'
+    final response = await http.get(
+      Uri.parse('$baseUrl/resenas/?$type=$targetId'),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load reviews');
+    }
+  }
+
+  Future<void> postReview(
+    int targetId,
+    String type,
+    int rating,
+    String text,
+  ) async {
+    if (currentUserId == null) throw Exception("User not logged in");
+
+    final body = {
+      'usuario': currentUserId,
+      'calificacion': rating,
+      'texto': text,
+      type: targetId, // 'lugar': 123 or 'ruta': 456
+    };
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/resenas/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception('Failed to post review: ${response.body}');
+    }
+  }
+
+  Future<void> updateReview(int reviewId, int rating, String text) async {
+    final body = {'calificacion': rating, 'texto': text};
+
+    final response = await http.patch(
+      Uri.parse('$baseUrl/resenas/$reviewId/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update review: ${response.body}');
+    }
+  }
+
+  Future<void> deleteReview(int reviewId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/resenas/$reviewId/'),
+    );
+
+    if (response.statusCode != 204) {
+      throw Exception('Failed to delete review: ${response.body}');
     }
   }
 }

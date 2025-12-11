@@ -15,6 +15,7 @@ class DetalleLugarScreen extends StatefulWidget {
 
 class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   final ApiService _apiService = ApiService();
+  late Lugar _lugar;
   
   // Estados locales
   bool _isFavorito = false;
@@ -22,15 +23,38 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   bool _isVisitado = false;
   bool _isLoading = true;
 
+  // Reseñas
+  List<dynamic> _reviews = [];
+  bool _loadingReviews = true;
+
   @override
   void initState() {
     super.initState();
+    _lugar = widget.lugar;
     _checkStatus();
+    _loadFullDetails();
+    _loadReviews();
+  }
+
+  Future<void> _loadFullDetails() async {
+    // Si la descripción es el placeholder, cargamos los detalles completos
+    if (_lugar.descripcion == "Cargando detalles..." || _lugar.latitud == 0) {
+      try {
+        final fullLugar = await _apiService.getLugar(_lugar.id);
+        if (mounted) {
+          setState(() {
+            _lugar = fullLugar;
+          });
+        }
+      } catch (e) {
+        print("Error loading full details: $e");
+      }
+    }
   }
 
   Future<void> _checkStatus() async {
     try {
-      final status = await _apiService.checkFavoritoStatus(widget.lugar.id);
+      final status = await _apiService.checkFavoritoStatus(_lugar.id);
       if (mounted) {
         setState(() {
           _isFavorito = status['FAV'] ?? false;
@@ -45,6 +69,90 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
     }
   }
 
+  Future<void> _loadReviews() async {
+    try {
+      final reviews = await _apiService.getReviews(_lugar.id, 'lugar');
+      if (mounted) {
+        setState(() {
+          _reviews = reviews;
+          _loadingReviews = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading reviews: $e");
+      if (mounted) setState(() => _loadingReviews = false);
+    }
+  }
+
+  Future<void> _postReview() async {
+    final TextEditingController commentController = TextEditingController();
+    int rating = 5;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text("Calificar Lugar"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < rating ? Icons.star : Icons.star_border,
+                          color: Colors.amber,
+                          size: 32,
+                        ),
+                        onPressed: () {
+                          setStateDialog(() => rating = index + 1);
+                        },
+                      );
+                    }),
+                  ),
+                  TextField(
+                    controller: commentController,
+                    decoration: const InputDecoration(
+                      hintText: "Escribe tu opinión...",
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancelar"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _apiService.postReview(_lugar.id, 'lugar', rating, commentController.text);
+                      _loadReviews(); // Reload
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("¡Gracias por tu reseña!")),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Error: $e")),
+                      );
+                    }
+                  },
+                  child: const Text("Publicar"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _toggleStatus(String tipo, bool isActive) async {
     // Optimistic update
     setState(() {
@@ -54,7 +162,7 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
     });
 
     try {
-      await _apiService.toggleFavorito(widget.lugar.id, tipo, isActive);
+      await _apiService.toggleFavorito(_lugar.id, tipo, isActive);
     } catch (e) {
       // Revert if error
       print("Error toggling status: $e");
@@ -178,7 +286,8 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   @override
   Widget build(BuildContext context) {
     final Color primaryPurple = Theme.of(context).primaryColor;
-    final lugar = widget.lugar;
+    // Usamos _lugar que puede haber sido actualizado
+    final lugar = _lugar;
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -261,7 +370,7 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                       const Icon(Icons.star, color: Colors.amber, size: 20),
                       const SizedBox(width: 4),
                       Text(
-                        "(0 reseñas)", // TODO: Traer reseñas reales
+                        "(${_reviews.length} reseñas)", 
                         style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                       ),
                       const Spacer(),
@@ -442,7 +551,57 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 30),
+                  const Divider(),
+                  const SizedBox(height: 10),
+
+                  // --- SECCIÓN DE RESEÑAS ---
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Reseñas",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      TextButton.icon(
+                        onPressed: _postReview,
+                        icon: const Icon(Icons.rate_review, size: 18),
+                        label: const Text("Opinar"),
+                      ),
+                    ],
+                  ),
+                  
+                  if (_loadingReviews)
+                    const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+                  else if (_reviews.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text("Sé el primero en opinar sobre este lugar.", style: TextStyle(color: Colors.grey)),
+                    )
+                  else
+                    ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _reviews.length,
+                      itemBuilder: (context, index) {
+                        final review = _reviews[index];
+                        return ListTile(
+                          leading: const CircleAvatar(child: Icon(Icons.person, size: 16)),
+                          title: Text(review['usuario_username'] ?? 'Usuario'),
+                          subtitle: Text(review['texto'] ?? ''),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text("${review['calificacion']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                              const Icon(Icons.star, color: Colors.amber, size: 16),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+
+                  const SizedBox(height: 40),
                 ],
               ),
             ),

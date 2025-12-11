@@ -10,10 +10,7 @@ import '../services/api_service.dart';
 class DetalleRutaScreen extends StatefulWidget {
   final Ruta ruta;
 
-  const DetalleRutaScreen({
-    super.key,
-    required this.ruta,
-  });
+  const DetalleRutaScreen({super.key, required this.ruta});
 
   @override
   State<DetalleRutaScreen> createState() => _DetalleRutaScreenState();
@@ -26,11 +23,107 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
   bool _isCheckingStatus = true;
   bool _esMia = false;
 
+  // --- RESEÑAS ---
+  List<dynamic> _reviews = [];
+  bool _loadingReviews = true;
+
   @override
   void initState() {
     super.initState();
     _futureRutaLugares = _apiService.fetchRutaLugares(widget.ruta.id);
     _checkStatus();
+    _loadReviews();
+  }
+
+  Future<void> _loadReviews() async {
+    try {
+      final reviews = await _apiService.getReviews(widget.ruta.id, 'ruta');
+      if (mounted) {
+        setState(() {
+          _reviews = reviews;
+          _loadingReviews = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading reviews: $e");
+      if (mounted) setState(() => _loadingReviews = false);
+    }
+  }
+
+  Future<void> _postReview() async {
+    final TextEditingController commentController = TextEditingController();
+    int rating = 5;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text("Calificar Ruta"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < rating ? Icons.star : Icons.star_border,
+                          color: Colors.amber,
+                          size: 32,
+                        ),
+                        onPressed: () {
+                          setStateDialog(() => rating = index + 1);
+                        },
+                      );
+                    }),
+                  ),
+                  TextField(
+                    controller: commentController,
+                    decoration: const InputDecoration(
+                      hintText: "Escribe tu opinión...",
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancelar"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _apiService.postReview(
+                        widget.ruta.id,
+                        'ruta',
+                        rating,
+                        commentController.text,
+                      );
+                      _loadReviews(); // Reload
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("¡Gracias por tu reseña!"),
+                        ),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+                    }
+                  },
+                  child: const Text("Publicar"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _checkStatus() async {
@@ -39,7 +132,7 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
       setState(() {
         _esMia = widget.ruta.usuario == currentUserId;
       });
-      
+
       if (!_esMia) {
         final saved = await _apiService.checkRutaGuardadaStatus(widget.ruta.id);
         if (mounted) {
@@ -55,22 +148,24 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
   }
 
   Future<void> _toggleGuardar() async {
-    // Optimistic update
     setState(() => _isSaved = !_isSaved);
     try {
       await _apiService.toggleGuardarRuta(widget.ruta.id, _isSaved);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isSaved ? "Ruta guardada en Mis Rutas" : "Ruta eliminada de Mis Rutas"),
+          content: Text(
+            _isSaved
+                ? "Ruta guardada en Mis Rutas"
+                : "Ruta eliminada de Mis Rutas",
+          ),
           duration: const Duration(seconds: 1),
         ),
       );
     } catch (e) {
-      // Revert
       setState(() => _isSaved = !_isSaved);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error al actualizar: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error al actualizar: $e")));
     }
   }
 
@@ -81,10 +176,9 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
         builder: (context) => EditarRutaPage(ruta: widget.ruta),
       ),
     ).then((_) {
-      // Refresh details if needed, or just pop back
       setState(() {
-         // Force refresh of places
-         _futureRutaLugares = _apiService.fetchRutaLugares(widget.ruta.id);
+        _futureRutaLugares = _apiService.fetchRutaLugares(widget.ruta.id);
+        _loadReviews();
       });
     });
   }
@@ -92,6 +186,9 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = Theme.of(context).primaryColor;
+
+    // Calcular tiempo total (estimado + paradas)
+    int totalMinutos = widget.ruta.duracionEstimadaSeg ~/ 60;
 
     return Scaffold(
       body: CustomScrollView(
@@ -118,7 +215,8 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                       ? Image.network(
                           widget.ruta.urlImagenPortada!,
                           fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => Container(color: Colors.grey),
+                          errorBuilder: (c, e, s) =>
+                              Container(color: Colors.grey),
                         )
                       : Container(color: Colors.grey),
                   Container(
@@ -191,9 +289,12 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                         ],
                       ),
                       const Spacer(),
-                      _buildStatBadge(Icons.timer, "${widget.ruta.duracionEstimadaSeg ~/ 60} min"),
+                      _buildStatBadge(Icons.timer, "$totalMinutos min"),
                       const SizedBox(width: 8),
-                      _buildStatBadge(Icons.directions_walk, "${widget.ruta.distanciaEstimadaKm} km"),
+                      _buildStatBadge(
+                        Icons.directions_walk,
+                        "${widget.ruta.distanciaEstimadaKm} km",
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -213,7 +314,7 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        "Paradas",
+                        "Itinerario",
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -221,7 +322,7 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                       ),
                       TextButton(
                         onPressed: () {
-                           Navigator.push(
+                          Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => Mapa(ruta: widget.ruta),
@@ -250,11 +351,87 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: snapshot.data!.length,
                         itemBuilder: (context, index) {
-                          return _buildParadaItem(context, index, snapshot.data![index]);
+                          return _buildParadaItem(
+                            context,
+                            index,
+                            snapshot.data![index],
+                          );
                         },
                       );
                     },
                   ),
+
+                  const SizedBox(height: 30),
+                  const Divider(),
+                  const SizedBox(height: 10),
+
+                  // --- SECCIÓN DE RESEÑAS ---
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Reseñas",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _postReview,
+                        icon: const Icon(Icons.rate_review, size: 18),
+                        label: const Text("Opinar"),
+                      ),
+                    ],
+                  ),
+
+                  if (_loadingReviews)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (_reviews.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        "Sé el primero en opinar sobre esta ruta.",
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _reviews.length,
+                      itemBuilder: (context, index) {
+                        final review = _reviews[index];
+                        return ListTile(
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.person, size: 16),
+                          ),
+                          title: Text(review['usuario_username'] ?? 'Usuario'),
+                          subtitle: Text(review['texto'] ?? ''),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "${review['calificacion']}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const Icon(
+                                Icons.star,
+                                color: Colors.amber,
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
 
                   const SizedBox(height: 80),
                 ],
@@ -267,13 +444,11 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20.0),
         child: ElevatedButton.icon(
           onPressed: () {
-             Navigator.push(
+            Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => Mapa(
-                  ruta: widget.ruta,
-                  startNavigation: true,
-                ),
+                builder: (context) =>
+                    Mapa(ruta: widget.ruta, startNavigation: true),
               ),
             );
           },
@@ -321,8 +496,6 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
   ) {
     return InkWell(
       onTap: () {
-        // Create a partial Lugar object since we only have limited info here
-        // Ideally we should fetch the full Lugar details
         Lugar partialLugar = Lugar(
           id: rutaLugar.lugar,
           nombre: rutaLugar.lugarNombre,
@@ -332,12 +505,15 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
         );
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => DetalleLugarScreen(lugar: partialLugar)),
+          MaterialPageRoute(
+            builder: (context) => DetalleLugarScreen(lugar: partialLugar),
+          ),
         );
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12.0),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               width: 30,
@@ -368,10 +544,28 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                       fontSize: 16,
                     ),
                   ),
-                  Text(
-                    "Punto de interés",
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                  ),
+                  if (rutaLugar.tiempoSugeridoMinutos > 0)
+                    Text(
+                      "Tiempo sugerido: ${rutaLugar.tiempoSugeridoMinutos} min",
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  if (rutaLugar.comentario != null &&
+                      rutaLugar.comentario!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text(
+                        rutaLugar.comentario!,
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 13,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

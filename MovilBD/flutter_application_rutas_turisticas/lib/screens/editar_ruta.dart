@@ -28,7 +28,7 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
   bool _isLoadingCategorias = true;
 
   bool _isPublic = true;
-  List<Lugar> _puntosRuta = [];
+  List<Map<String, dynamic>> _puntosRuta = [];
   bool _isSaving = false;
 
   @override
@@ -57,16 +57,19 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
       if (widget.ruta != null) {
         final rutaLugares = await apiService.fetchRutaLugares(widget.ruta!.id);
         
-        // Mapear IDs de RutaLugar a objetos Lugar completos
+        // Mapear IDs de RutaLugar a objetos Lugar completos con metadatos
         _puntosRuta = rutaLugares.map((rl) {
           try {
-            return todosLosLugares.firstWhere((l) => l.id == rl.lugar);
+            final lugar = todosLosLugares.firstWhere((l) => l.id == rl.lugar);
+            return {
+              'lugar': lugar,
+              'tiempo': rl.tiempoSugeridoMinutos,
+              'comentario': rl.comentario ?? '',
+            };
           } catch (e) {
-            // Si no se encuentra (caso raro), retornamos un lugar dummy o lo omitimos
-            // Para seguridad, filtramos nulos después si fuera necesario, pero firstWhere lanza excepción
             return null; 
           }
-        }).whereType<Lugar>().toList(); // Filtramos los nulos si hubo error
+        }).whereType<Map<String, dynamic>>().toList();
       }
 
       setState(() {
@@ -144,7 +147,18 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
 
       // Añadir lugares (para crear y actualizar)
       for (int i = 0; i < _puntosRuta.length; i++) {
-        await apiService.addLugarToRuta(rutaGuardada.id, _puntosRuta[i].id, i);
+        final item = _puntosRuta[i];
+        final lugar = item['lugar'] as Lugar;
+        final tiempo = item['tiempo'] as int;
+        final comentario = item['comentario'] as String;
+
+        await apiService.addLugarToRuta(
+          rutaGuardada.id, 
+          lugar.id, 
+          i, 
+          tiempoSugerido: tiempo,
+          comentario: comentario.isNotEmpty ? comentario : null,
+        );
       }
 
       if (mounted) {
@@ -374,7 +388,7 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
                       if (oldIndex < newIndex) {
                         newIndex -= 1;
                       }
-                      final Lugar item = _puntosRuta.removeAt(oldIndex);
+                      final item = _puntosRuta.removeAt(oldIndex);
                       _puntosRuta.insert(newIndex, item);
                     });
                   },
@@ -382,6 +396,7 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
                     index,
                     _puntosRuta[index],
                     () => setState(() => _puntosRuta.removeAt(index)),
+                    () => _editarDetallesPunto(index),
                   ),
                 ),
               const SizedBox(height: 16),
@@ -396,7 +411,11 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
                     ),
                   );
                   if (resultado != null && resultado is Lugar) {
-                    setState(() => _puntosRuta.add(resultado));
+                    setState(() => _puntosRuta.add({
+                      'lugar': resultado,
+                      'tiempo': 60, // Default 60 min
+                      'comentario': '',
+                    }));
                   }
                 },
                 icon: Icon(Icons.add, color: primaryColor),
@@ -460,7 +479,68 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
     );
   }
 
-  Widget _buildPuntoItem(int index, Lugar lugar, VoidCallback onDelete) {
+  Future<void> _editarDetallesPunto(int index) async {
+    final item = _puntosRuta[index];
+    final lugar = item['lugar'] as Lugar;
+    int tiempo = item['tiempo'] as int;
+    String comentario = item['comentario'] as String;
+    
+    final TextEditingController timeController = TextEditingController(text: tiempo.toString());
+    final TextEditingController commentController = TextEditingController(text: comentario);
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Editar detalles: ${lugar.nombre}"),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: timeController,
+                decoration: const InputDecoration(
+                  labelText: "Tiempo sugerido (minutos)",
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: commentController,
+                decoration: const InputDecoration(
+                  labelText: "Comentario / Nota",
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancelar"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _puntosRuta[index]['tiempo'] = int.tryParse(timeController.text) ?? 0;
+                _puntosRuta[index]['comentario'] = commentController.text;
+              });
+              Navigator.pop(context);
+            },
+            child: const Text("Guardar"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPuntoItem(int index, Map<String, dynamic> item, VoidCallback onDelete, VoidCallback onEdit) {
+    final lugar = item['lugar'] as Lugar;
+    final tiempo = item['tiempo'] as int;
+    final comentario = item['comentario'] as String;
+
     return Container(
       key: ValueKey(lugar.id), // Importante para ReorderableListView
       margin: const EdgeInsets.symmetric(vertical: 4.0),
@@ -473,12 +553,29 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
         leading: const Icon(Icons.drag_handle, color: Colors.grey),
         title: Text(
           "${index + 1}. ${lugar.nombre}",
-          style: const TextStyle(fontSize: 16),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
-          onPressed: onDelete,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Tiempo: $tiempo min"),
+            if (comentario.isNotEmpty)
+              Text("Nota: $comentario", maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blue),
+              onPressed: onEdit,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: onDelete,
+            ),
+          ],
         ),
       ),
     );
