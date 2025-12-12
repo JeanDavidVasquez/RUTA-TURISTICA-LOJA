@@ -45,14 +45,18 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perfil actualizado correctamente')),
+          const SnackBar(
+            content: Text('¡Perfil actualizado con éxito!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-        Navigator.pop(context, true); // Retorna true para indicar que hubo cambios
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar: $e')),
+          SnackBar(content: Text('Error al actualizar: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -62,84 +66,177 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Foto actual para el preview (URL del controller o la del usuario)
+    final ImageProvider? bgImage = _fotoController.text.isNotEmpty
+        ? NetworkImage(_fotoController.text)
+        : (widget.usuario.urlFotoPerfil != null
+        ? NetworkImage(widget.usuario.urlFotoPerfil!)
+        : null);
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F9FC), // Fondo moderno
       appBar: AppBar(
-        title: const Text("Editar Perfil"),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: const Text("Editar Perfil", style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
+        physics: const BouncingScrollPhysics(),
         child: Form(
           key: _formKey,
           child: Column(
             children: [
-              // Preview de la foto
+              const SizedBox(height: 10),
+
+              // --- 1. AVATAR CON BOTÓN DE CÁMARA ---
               Center(
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundImage: _fotoController.text.isNotEmpty
-                      ? NetworkImage(_fotoController.text)
-                      : (widget.usuario.urlFotoPerfil != null
-                          ? NetworkImage(widget.usuario.urlFotoPerfil!)
-                          : null),
-                  child: (_fotoController.text.isEmpty && widget.usuario.urlFotoPerfil == null)
-                      ? const Icon(Icons.person, size: 50)
-                      : null,
+                child: Stack(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        radius: 60,
+                        backgroundColor: const Color(0xFF6C5CE7).withOpacity(0.2),
+                        backgroundImage: bgImage,
+                        child: bgImage == null
+                            ? const Icon(Icons.person, size: 60, color: Color(0xFF6C5CE7))
+                            : null,
+                      ),
+                    ),
+                    // Icono de cámara flotante
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF6C5CE7), // Morado principal
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: Colors.black26, blurRadius: 5),
+                          ],
+                        ),
+                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
 
-              TextFormField(
+              // --- 2. INPUT: NOMBRE ---
+              _buildModernTextField(
                 controller: _nombreController,
-                decoration: InputDecoration(
-                  labelText: "Nombre para mostrar",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.person_outline),
-                ),
+                label: "Nombre Completo",
+                icon: Icons.person_outline_rounded,
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor ingresa un nombre';
-                  }
+                  if (value == null || value.isEmpty) return 'El nombre es obligatorio';
                   return null;
                 },
               ),
               const SizedBox(height: 20),
 
-              TextFormField(
+              // --- 3. INPUT: URL FOTO ---
+              _buildModernTextField(
                 controller: _fotoController,
-                decoration: InputDecoration(
-                  labelText: "URL de Foto de Perfil",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.image_outlined),
-                  helperText: "Pega el enlace de una imagen de internet",
-                ),
-                onChanged: (val) => setState(() {}), // Para actualizar el preview
+                label: "URL de Foto de Perfil",
+                icon: Icons.link_rounded,
+                helperText: "Pega aquí un enlace de imagen (jpg/png)",
+                onChanged: (val) => setState(() {}), // Actualiza el avatar arriba
               ),
-              const SizedBox(height: 40),
 
+              const SizedBox(height: 50),
+
+              // --- 4. BOTÓN GUARDAR ---
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _guardarCambios,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
+                    backgroundColor: const Color(0xFF6C5CE7),
+                    foregroundColor: Colors.white,
+                    elevation: 10,
+                    shadowColor: const Color(0xFF6C5CE7).withOpacity(0.4),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
+                      ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                  )
                       : const Text(
-                          "Guardar Cambios",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
+                    "Guardar Cambios",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // Widget auxiliar para los inputs bonitos
+  Widget _buildModernTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? helperText,
+    String? Function(String?)? validator,
+    void Function(String)? onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: controller,
+        validator: validator,
+        onChanged: onChanged,
+        style: const TextStyle(fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          labelText: label,
+          helperText: helperText,
+          helperStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon: Icon(icon, color: const Color(0xFF6C5CE7)),
+          labelStyle: TextStyle(color: Colors.grey[600]),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none, // Sin borde negro feo
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
       ),
     );

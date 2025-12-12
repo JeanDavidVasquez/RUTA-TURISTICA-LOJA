@@ -1,8 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-// Asegúrate de que login.dart esté en la misma carpeta o ajusta la ruta
-// (Aunque solo usamos Navigator.pop() para regresar, es bueno ser consistente)
-
 import '../services/api_service.dart';
 
 class Register extends StatefulWidget {
@@ -20,198 +16,130 @@ class _RegisterState extends State<Register> {
   bool _isLoading = false;
 
   void _register() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      // Usamos el nombre como username por simplicidad
-      await _apiService.register(
-        _usernameController.text,
-        _emailController.text,
-        _passwordController.text,
-      );
-
+      await _apiService.register(_usernameController.text, _emailController.text, _passwordController.text);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registro exitoso! Por favor inicia sesión.')),
-        );
-        Navigator.pop(context); // Regresar al Login
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Cuenta creada!'), backgroundColor: Colors.green));
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Reutilizamos el mismo método constructor de botones sociales
-  Widget _buildSocialButton({
-    required IconData icon,
-    required Color color,
-    required Color iconColor,
-    VoidCallback? onPressed,
-  }) {
-    return Material(
-      color: color,
-      borderRadius: BorderRadius.circular(8),
-      elevation: 1.0, // Sombra sutil
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(8),
-        child: SizedBox(
-          width: 50, // Más cuadrado
-          height: 50,
-          child: Center(
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 22, // Tamaño de icono
+  @override
+  Widget build(BuildContext context) {
+    const Color purpleStart = Color(0xFF8667F2);
+    const Color purpleEnd = Color(0xFF6C5CE7);
+
+    return Scaffold(
+      body: SingleChildScrollView(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            // --- HEADER CURVO MORADO ---
+            Container(
+              height: 300, // Un poco más pequeño que en login
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [purpleStart, purpleEnd],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(60),
+                  bottomRight: Radius.circular(60),
+                ),
+              ),
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                    Image.asset('assets/Logo.png', height: 100, color: Colors.white),
+                    const SizedBox(height: 10),
+                    const Text("Crear Cuenta", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
             ),
-          ),
+
+            // --- FORMULARIO ---
+            Padding(
+              padding: const EdgeInsets.all(30.0),
+              child: Column(
+                children: [
+                  _buildInput(_usernameController, "Nombre de usuario", Icons.person_outline),
+                  const SizedBox(height: 20),
+                  _buildInput(_emailController, "Correo electrónico", Icons.email_outlined),
+                  const SizedBox(height: 20),
+                  _buildInput(_passwordController, "Contraseña", Icons.lock_outline, isPassword: true),
+
+                  const SizedBox(height: 40),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _register,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: purpleEnd,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 5,
+                        shadowColor: purpleEnd.withOpacity(0.4),
+                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text("REGISTRARSE", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("¿Ya tienes cuenta? ", style: TextStyle(color: Colors.grey)),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Text("Inicia sesión", style: TextStyle(color: purpleEnd, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Colores definidos en la pantalla de Login, los reutilizamos
-    const Color linkColor = Color(0xFF8667F2);
-    const Color goldColor = Color(0xFFF3B63D);
-
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 40.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: <Widget>[
-              const SizedBox(
-                height: 60,
-              ), // Menos espacio superior para más campos
-              const Text(
-                'REGISTER', // Título cambiado
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Crea tu cuenta',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 30),
-
-              // --- Nuevos Campos de Registro ---
-              // Fila para Nombre y Apellido
-              TextField(
-                controller: _usernameController,
-                decoration: const InputDecoration(hintText: 'Username'),
-              ),
-              const SizedBox(height: 16),
-              // Campo de Email
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(hintText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 16),
-              // Campo de Contraseña
-              TextField(
-                controller: _passwordController,
-                decoration: const InputDecoration(
-                  hintText: "Password",
-                ),
-                obscureText: true,
-              ),
-              // --- Fin de Nuevos Campos ---
-
-              // Eliminamos el 'Olvidaste tu contraseña?'
-              const SizedBox(height: 30),
-              // Botón de Submit (usa el tema global)
-              ElevatedButton(
-                onPressed: _isLoading ? null : _register,
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Submit'),
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                'Or continue with',
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 20),
-
-              // Botones sociales (idénticos a Login)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  _buildSocialButton(
-                    color: goldColor,
-                    icon: FontAwesomeIcons.google,
-                    iconColor: Colors.black,
-                    onPressed: () {},
-                  ),
-                  const SizedBox(width: 15),
-                  _buildSocialButton(
-                    color: goldColor,
-                    icon: FontAwesomeIcons.facebookF,
-                    iconColor: Colors.black,
-                    onPressed: () {},
-                  ),
-                  const SizedBox(width: 15),
-                  _buildSocialButton(
-                    color: goldColor,
-                    icon: FontAwesomeIcons.apple,
-                    iconColor: Colors.black,
-                    onPressed: () {},
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
-
-              // --- Enlace para regresar a Login ---
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Already have an account? "),
-                  TextButton(
-                    onPressed: () {
-                      // Simplemente regresa a la pantalla anterior (Login)
-                      Navigator.pop(context);
-                    },
-                    child: const Text(
-                      "Login",
-                      style: TextStyle(
-                        color: linkColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-              // Logo (idéntico a Login)
-              Image.asset(
-                'assets/Logo.png',
-                width: 80, // Un poco más pequeño para que quepa todo
-                height: 80,
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
+  Widget _buildInput(TextEditingController controller, String hint, IconData icon, {bool isPassword = false}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F6FA),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: isPassword,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon: Icon(icon, color: const Color(0xFF8667F2)),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         ),
       ),
     );
