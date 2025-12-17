@@ -27,34 +27,28 @@ class _SplashState extends State<Splash> {
 
   @override
   Widget build(BuildContext context) {
-    // Definimos el color morado de la marca
+    // Tu color morado de marca
     const Color brandPurple = Color(0xFF8667F2);
 
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
-          // 1. LA FOTO DE FONDO (Se mantiene)
+          // 1. FOTO DE FONDO (Se mantiene)
           Image.asset(
             'assets/Fondo_Splash.png',
             fit: BoxFit.cover,
           ),
 
-          // 2. CAPA DE OSCURECIMIENTO (Se mantiene para contraste)
+          // 2. CAPA BLANCA TRANSLÚCIDA (Overlay)
+          // Esto es necesario para que las letras MORADAS se lean sobre la foto
           Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.4),
-                  Colors.black.withOpacity(0.7),
-                ],
-              ),
+              color: Colors.white.withOpacity(0.92), // Ajusta opacidad si quieres ver más foto
             ),
           ),
 
-          // 3. CONTENIDO CENTRADO EN MORADO
+          // 3. CONTENIDO CENTRADO Y MORADO
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30.0),
@@ -62,46 +56,41 @@ class _SplashState extends State<Splash> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // LOGO (Ahora en morado)
+                  // LOGO (Color Morado)
                   Hero(
                     tag: 'logo_splash',
                     child: Image.asset(
                       'assets/Logo.png',
                       height: 140,
                       width: 140,
-                      color: brandPurple, // <-- CAMBIO AQUÍ
+                      color: brandPurple, // EL LOGO AHORA ES MORADO
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 25),
 
-                  // TÍTULO DE LA APP (Ahora en morado)
+                  // TÍTULO (Color Morado)
                   const Text(
                     "RT Mobile",
                     style: TextStyle(
-                      fontSize: 40,
+                      fontSize: 42,
                       fontWeight: FontWeight.w900,
-                      color: brandPurple, // <-- CAMBIO AQUÍ
-                      letterSpacing: 1.0,
-                      shadows: [
-                        // Sombra negra suave para que el morado se lea bien sobre el fondo oscuro
-                        Shadow(offset: Offset(0, 2), blurRadius: 5, color: Colors.black)
-                      ],
+                      color: brandPurple, // TEXTO MORADO
+                      letterSpacing: 1.2,
                     ),
                   ),
 
                   const SizedBox(height: 20),
 
-                  // FRASE DE BIENVENIDA (Ahora en morado)
+                  // FRASE DE BIENVENIDA (Color Morado Oscuro)
                   Text(
                     "Hola de nuevo,\nbienvenido a la aventura.",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 22,
-                      color: brandPurple.withOpacity(0.9), // <-- CAMBIO AQUÍ (un poco más suave)
+                      fontSize: 20,
+                      color: brandPurple.withOpacity(0.8), // Un tono un poco más suave
                       fontWeight: FontWeight.w600,
-                      height: 1.4,
-                      fontStyle: FontStyle.italic,
+                      height: 1.3,
                     ),
                   ),
                 ],
@@ -109,14 +98,14 @@ class _SplashState extends State<Splash> {
             ),
           ),
 
-          // 4. LOADER (También en morado)
+          // 4. LOADER (Morado)
           const Positioned(
             bottom: 60,
             left: 0,
             right: 0,
             child: Center(
               child: CircularProgressIndicator(
-                color: brandPurple, // <-- CAMBIO AQUÍ
+                color: brandPurple,
                 strokeWidth: 3,
               ),
             ),

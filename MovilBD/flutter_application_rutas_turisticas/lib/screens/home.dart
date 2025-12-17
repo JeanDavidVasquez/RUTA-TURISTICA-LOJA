@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_rutas_turisticas/screens/details_places.dart';
+import 'package:flutter_application_rutas_turisticas/screens/details_places.dart'; 
 import 'package:flutter_application_rutas_turisticas/screens/detalle_ruta.dart';
 import '../services/api_service.dart';
 import '../models/lugar.dart';
@@ -31,6 +31,9 @@ class _HomeState extends State<Home> {
   // Categories
   List<Categoria> _categories = [];
 
+  // --- Estado para manejar los favoritos visualmente ---
+  final Set<int> _favoritosIds = {}; 
+
   @override
   void initState() {
     super.initState();
@@ -51,13 +54,59 @@ class _HomeState extends State<Home> {
     });
   }
 
+  // --- Función para dar Like y llamar a la API ---
+  Future<void> _toggleFavorite(int lugarId) async {
+    bool isLiked = _favoritosIds.contains(lugarId);
+    bool newStatus = !isLiked;
+
+    // 1. Actualización Optimista (Visual inmediata)
+    setState(() {
+      if (isLiked) {
+        _favoritosIds.remove(lugarId); // Quitar like
+      } else {
+        _favoritosIds.add(lugarId); // Dar like
+      }
+    });
+
+    try {
+      // 2. LLAMADA A LA BASE DE DATOS
+      await _apiService.toggleFavorito(lugarId, 'FAV', newStatus);
+      print("Like guardado en servidor para ID: $lugarId, Estado: $newStatus");
+    } catch (e) {
+      // 3. Revertir si falla el servidor
+      setState(() {
+        if (!newStatus) { 
+           _favoritosIds.add(lugarId);
+        } else { 
+           _favoritosIds.remove(lugarId);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error de conexión: $e")),
+      );
+    }
+  }
+
+  // --- CORRECCIÓN AQUÍ: Cargamos también los favoritos al iniciar ---
   Future<void> _fetchData() async {
     try {
-      final lugares = await _apiService.fetchLugares();
-      final rutas = await _apiService.fetchRutas();
-      final allCategorias = await _apiService.fetchCategorias();
+      // 1. Carga paralela de datos básicos
+      final result = await Future.wait([
+        _apiService.fetchLugares(),
+        _apiService.fetchRutas(),
+        _apiService.fetchCategorias(),
+      ]);
 
-      // Filter categories
+      final lugares = result[0] as List<Lugar>;
+      final rutas = result[1] as List<Ruta>;
+      final allCategorias = result[2] as List<Categoria>;
+
+      // 2. IMPORTANTE: Recuperar los favoritos guardados en la BD
+      // Esto evita que se borren los corazones al recargar o cambiar de pestaña
+      final favoritosGuardados = await _apiService.fetchUserFavoritos('FAV');
+      final Set<int> idsFavoritosRecuperados = favoritosGuardados.map((l) => l.id).toSet();
+
+      // 3. Filtrar categorías
       final Set<int> usedCategoryIds = {};
       for (var lugar in lugares) {
         for (var cat in lugar.categorias) {
@@ -81,6 +130,10 @@ class _HomeState extends State<Home> {
           _categories = usedCategories;
           _filteredLugares = lugares;
           _filteredRutas = rutas;
+          
+          // Asignamos los favoritos que vinieron de la base de datos
+          _favoritosIds.addAll(idsFavoritosRecuperados);
+          
           _isLoading = false;
           _applyFilters();
         });
@@ -90,6 +143,7 @@ class _HomeState extends State<Home> {
         setState(() {
           _isLoading = false;
         });
+        print("Error en fetchData: $e");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error cargando datos: $e')),
         );
@@ -131,9 +185,8 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    // Usamos colores más limpios tipo E-commerce moderno
     final primaryColor = Theme.of(context).primaryColor;
-    final backgroundColor = const Color(0xFFF7F7F7); // Gris muy suave estilo Temu
+    final backgroundColor = const Color(0xFFF7F7F7); 
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -141,82 +194,70 @@ class _HomeState extends State<Home> {
         child: _isLoading
             ? Center(child: CircularProgressIndicator(color: primaryColor))
             : CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // 1. Header con Buscador (Estilo App moderna)
-            SliverToBoxAdapter(
-              child: _buildHeader(primaryColor),
-            ),
-
-            // 2. Categorías (Pills horizontales)
-            SliverToBoxAdapter(
-              child: _buildCategories(primaryColor),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-            // 3. Sección Rutas (Lista Horizontal - Estilo "Ofertas Flash")
-            if (_filteredRutas.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: _buildSectionTitle("Rutas Populares", () {}),
-              ),
-              SliverToBoxAdapter(
-                child: Container(
-                  height: 160, // Un poco más compacto
-                  margin: const EdgeInsets.only(top: 12, bottom: 20),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _filteredRutas.length,
-                    itemBuilder: (context, index) {
-                      return _buildRouteCard(_filteredRutas[index]);
-                    },
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _buildHeader(primaryColor),
                   ),
-                ),
-              ),
-            ],
-
-            // 4. Título Grid Principal
-            if (_filteredLugares.isNotEmpty)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Text(
-                    "Explora Loja",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.grey[900],
+                  SliverToBoxAdapter(
+                    child: _buildCategories(primaryColor),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  if (_filteredRutas.isNotEmpty) ...[
+                    SliverToBoxAdapter(
+                      child: _buildSectionTitle("Rutas Populares", () {}),
                     ),
-                  ),
-                ),
+                    SliverToBoxAdapter(
+                      child: Container(
+                        height: 160,
+                        margin: const EdgeInsets.only(top: 12, bottom: 20),
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filteredRutas.length,
+                          itemBuilder: (context, index) {
+                            return _buildRouteCard(_filteredRutas[index]);
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_filteredLugares.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Text(
+                          "Explora Loja",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.grey[900],
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_filteredLugares.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.75,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            return _buildTemuStyleCard(_filteredLugares[index]);
+                          },
+                          childCount: _filteredLugares.length,
+                        ),
+                      ),
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                ],
               ),
-
-            // 5. GRID ESTILO TEMU (2 Columnas)
-            if (_filteredLugares.isNotEmpty)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, // 2 Columnas como Temu
-                    childAspectRatio: 0.75, // Relación de aspecto (Más alto que ancho)
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                      return _buildTemuStyleCard(_filteredLugares[index]);
-                    },
-                    childCount: _filteredLugares.length,
-                  ),
-                ),
-              ),
-
-            // Espacio extra abajo
-            const SliverToBoxAdapter(child: SizedBox(height: 80)),
-          ],
-        ),
       ),
     );
   }
@@ -246,7 +287,6 @@ class _HomeState extends State<Home> {
             ],
           ),
           const SizedBox(height: 12),
-          // Buscador estilo Input moderno
           Container(
             decoration: BoxDecoration(
               color: const Color(0xFFF0F0F0),
@@ -260,9 +300,9 @@ class _HomeState extends State<Home> {
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () => _searchController.clear(),
-                )
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => _searchController.clear(),
+                      )
                     : null,
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -276,7 +316,7 @@ class _HomeState extends State<Home> {
 
   Widget _buildCategories(Color primaryColor) {
     return Container(
-      color: Colors.white, // Fondo blanco para separar del resto
+      color: Colors.white,
       height: 50,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
@@ -293,8 +333,7 @@ class _HomeState extends State<Home> {
               alignment: Alignment.center,
               decoration: isSelected
                   ? BoxDecoration(
-                  border: Border(bottom: BorderSide(color: primaryColor, width: 2))
-              )
+                      border: Border(bottom: BorderSide(color: primaryColor, width: 2)))
                   : null,
               child: Text(
                 name,
@@ -327,7 +366,6 @@ class _HomeState extends State<Home> {
     );
   }
 
-  // Tarjeta Horizontal para Rutas
   Widget _buildRouteCard(Ruta ruta) {
     return Container(
       width: 260,
@@ -380,23 +418,46 @@ class _HomeState extends State<Home> {
     );
   }
 
-  // --- LA JOYA DE LA CORONA: TARJETA ESTILO TEMU ---
+  // --- TARJETA ESTILO TEMU ---
   Widget _buildTemuStyleCard(Lugar lugar) {
+    bool isLiked = _favoritosIds.contains(lugar.id);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8), // Bordes menos redondeados (Estilo moderno)
+        borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
       child: InkWell(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DetalleLugarScreen(lugar: lugar))),
+        // Navegamos al detalle y esperamos si cambió el estado
+        onTap: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DetalleLugarScreen(
+                lugar: lugar,
+                initialFavState: isLiked, // Pasamos el estado actual
+              ),
+            ),
+          );
+
+          // Si vuelve con un dato, actualizamos localmente
+          if (result != null && result is bool) {
+            setState(() {
+              if (result) {
+                _favoritosIds.add(lugar.id);
+              } else {
+                _favoritosIds.remove(lugar.id);
+              }
+            });
+          }
+        },
         borderRadius: BorderRadius.circular(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen ocupa gran parte (AspectRatio)
             Expanded(
               child: Stack(
                 children: [
@@ -412,24 +473,32 @@ class _HomeState extends State<Home> {
                       ),
                     ),
                   ),
-                  // Botón de Favorito flotante pequeño
                   Positioned(
                     bottom: 8,
                     right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                    child: GestureDetector(
+                      onTap: () {
+                         // Llama a la API y cambia estado visual
+                        _toggleFavorite(lugar.id);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                        ),
+                        child: Icon(
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          size: 18, 
+                          color: isLiked ? Colors.redAccent : Colors.black, 
+                        ),
                       ),
-                      child: const Icon(Icons.favorite_border, size: 16, color: Colors.black),
                     ),
                   )
                 ],
               ),
             ),
-            // Información debajo
             Padding(
               padding: const EdgeInsets.all(10.0),
               child: Column(

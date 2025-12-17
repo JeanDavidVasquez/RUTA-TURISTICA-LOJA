@@ -386,7 +386,6 @@ class _RutasListState extends State<_RutasList> {
     );
   }
 }
-
 class _ModernRutaCard extends StatelessWidget {
   final Ruta ruta;
   final bool esMia;

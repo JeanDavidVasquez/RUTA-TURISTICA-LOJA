@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
-
 import 'package:flutter_application_rutas_turisticas/screens/mapa.dart';
 import '../models/lugar.dart';
 import '../services/api_service.dart';
 
 class DetalleLugarScreen extends StatefulWidget {
   final Lugar lugar;
+  // NUEVO: Recibimos el estado inicial desde el Home
+  final bool? initialFavState; 
 
-  const DetalleLugarScreen({super.key, required this.lugar});
+  const DetalleLugarScreen({
+    super.key, 
+    required this.lugar,
+    this.initialFavState,
+  });
 
   @override
   State<DetalleLugarScreen> createState() => _DetalleLugarScreenState();
@@ -16,7 +21,7 @@ class DetalleLugarScreen extends StatefulWidget {
 class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   final ApiService _apiService = ApiService();
   late Lugar _lugar;
-  
+   
   // Estados locales
   bool _isFavorito = false;
   bool _isPendiente = false;
@@ -31,13 +36,24 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   void initState() {
     super.initState();
     _lugar = widget.lugar;
+    
+    // NUEVO: Inicializamos con el dato que viene del Home para que no parpadee
+    if (widget.initialFavState != null) {
+      _isFavorito = widget.initialFavState!;
+    }
+    
     _checkStatus();
     _loadFullDetails();
     _loadReviews();
   }
 
+  // --- Método para manejar el regreso al Home ---
+  // Esto devuelve el estado actualizado de _isFavorito al Home
+  void _onPop() {
+    Navigator.pop(context, _isFavorito);
+  }
+
   Future<void> _loadFullDetails() async {
-    // Si la descripción es el placeholder, cargamos los detalles completos
     if (_lugar.descripcion == "Cargando detalles..." || _lugar.latitud == 0) {
       try {
         final fullLugar = await _apiService.getLugar(_lugar.id);
@@ -57,7 +73,8 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
       final status = await _apiService.checkFavoritoStatus(_lugar.id);
       if (mounted) {
         setState(() {
-          _isFavorito = status['FAV'] ?? false;
+          // Si la API devuelve null o falla, mantenemos el estado local si ya lo teníamos
+          if (status['FAV'] != null) _isFavorito = status['FAV']!;
           _isPendiente = status['PEND'] ?? false;
           _isVisitado = status['VISIT'] ?? false;
           _isLoading = false;
@@ -133,7 +150,7 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                     Navigator.pop(context);
                     try {
                       await _apiService.postReview(_lugar.id, 'lugar', rating, commentController.text);
-                      _loadReviews(); // Reload
+                      _loadReviews(); 
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("¡Gracias por tu reseña!")),
                       );
@@ -163,8 +180,9 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
 
     try {
       await _apiService.toggleFavorito(_lugar.id, tipo, isActive);
+      // Éxito: Se guardó en la base
     } catch (e) {
-      // Revert if error
+      // Revertir si error
       print("Error toggling status: $e");
       if (mounted) {
         setState(() {
@@ -179,9 +197,6 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
     }
   }
 
-
-
-  // --- MÉTODO: MENU DE LISTAS (Bottom Sheet) ---
   void _mostrarOpcionesGuardado(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -189,7 +204,6 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        // Usamos StatefulBuilder para que los switches se muevan sin cerrar el modal
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return Container(
@@ -219,8 +233,6 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                     style: TextStyle(color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
-
-                  // Opción 1: Favoritos
                   ListTile(
                     leading: Icon(
                       _isFavorito ? Icons.favorite : Icons.favorite_border,
@@ -236,8 +248,6 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                       },
                     ),
                   ),
-
-                  // Opción 2: Pendientes
                   ListTile(
                     leading: Icon(
                       _isPendiente
@@ -255,8 +265,6 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                       },
                     ),
                   ),
-
-                  // Opción 3: Visitados
                   ListTile(
                     leading: Icon(
                       _isVisitado
@@ -286,332 +294,329 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   @override
   Widget build(BuildContext context) {
     final Color primaryPurple = Theme.of(context).primaryColor;
-    // Usamos _lugar que puede haber sido actualizado
     final lugar = _lugar;
 
-    return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- 1. IMAGEN DE CABECERA ---
-            Stack(
-              children: [
-                Container(
-                  height: 300,
-                  width: double.infinity,
-                  color: Colors.grey[300],
-                  child: Image.network(
-                    lugar.urlImagenPrincipal ?? "https://via.placeholder.com/400x300",
-                    fit: BoxFit.cover,
-                    errorBuilder: (c, e, s) =>
-                        const Icon(Icons.image, size: 100, color: Colors.grey),
-                  ),
-                ),
-                // Botón Atrás
-                Positioned(
-                  top: 40,
-                  left: 16,
-                  child: _buildCircleBtn(
-                    icon: Icons.arrow_back,
-                    onTap: () => Navigator.pop(context),
-                  ),
-                ),
-                // Botón Favorito Rápido (Top Right)
-                Positioned(
-                  top: 40,
-                  right: 16,
-                  child: _buildCircleBtn(
-                    icon: _isFavorito ? Icons.favorite : Icons.favorite_border,
-                    colorIcon: _isFavorito ? Colors.red : Colors.black,
-                    onTap: () => _toggleStatus('FAV', !_isFavorito),
-                  ),
-                ),
-              ],
-            ),
-
-            // --- 2. CONTENIDO ---
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    // Usamos PopScope para interceptar el botón físico de atrás en Android
+    return PopScope(
+      canPop: false, // Bloqueamos el pop automático para hacerlo manual
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        _onPop(); // Llamamos a nuestra función que devuelve datos
+      },
+      child: Scaffold(
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- 1. IMAGEN DE CABECERA ---
+              Stack(
                 children: [
-                  // Categorías
-                  if (lugar.categorias.isNotEmpty)
-                    Wrap(
-                      spacing: 8.0,
-                      runSpacing: 4.0,
-                      children: lugar.categorias.map((categoria) {
-                        return Chip(
-                          label: Text(categoria.nombre),
-                          backgroundColor: Colors.grey[200],
-                          labelStyle: const TextStyle(color: Colors.black54),
-                        );
-                      }).toList(),
-                    )
-                  else
-                    Chip(
-                      label: const Text("General"),
-                      backgroundColor: Colors.grey[200],
-                      labelStyle: const TextStyle(color: Colors.black54),
-                    ),
-                  const SizedBox(height: 16),
-
-                  // Título
-                  Text(
-                    lugar.nombre,
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Calificación y Estado Visitado
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 20),
-                      const SizedBox(width: 4),
-                      Text(
-                        "(${_reviews.length} reseñas)", 
-                        style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-                      ),
-                      const Spacer(),
-                      // Badge visual si ya fue visitado
-                      if (_isVisitado)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green[50],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.check, size: 14, color: Colors.green),
-                              SizedBox(width: 4),
-                              Text(
-                                "Visitado",
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Descripción
-                  const Text(
-                    "Descripción",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    lugar.descripcion,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[700],
-                      height: 1.5,
+                  Container(
+                    height: 300,
+                    width: double.infinity,
+                    color: Colors.grey[300],
+                    child: Image.network(
+                      lugar.urlImagenPrincipal ?? "https://via.placeholder.com/400x300",
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, e, s) =>
+                          const Icon(Icons.image, size: 100, color: Colors.grey),
                     ),
                   ),
-                  const SizedBox(height: 32),
-
-                  // Información Adicional
-                  if (lugar.direccionCompleta != null) ...[
-                    _buildInfoRow(
-                      Icons.location_on_outlined,
-                      "Dirección",
-                      lugar.direccionCompleta!,
+                  // Botón Atrás (ACTUALIZADO para usar _onPop)
+                  Positioned(
+                    top: 40,
+                    left: 16,
+                    child: _buildCircleBtn(
+                      icon: Icons.arrow_back,
+                      onTap: _onPop, // <--- CAMBIO IMPORTANTE
                     ),
-                    const SizedBox(height: 20),
-                  ],
-                  
-                  if (lugar.horarios != null) ...[
-                    _buildInfoRow(
-                      Icons.access_time,
-                      "Horarios",
-                      lugar.horarios!,
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-
-                  if (lugar.contacto != null) ...[
-                     _buildInfoRow(
-                      Icons.phone_outlined,
-                      "Contacto",
-                      lugar.contacto!,
-                    ),
-                    const SizedBox(height: 32),
-                  ],
-
-                  // --- 3. BOTONES DE ACCIÓN ---
-                  Row(
-                    children: [
-                      // Botón GUARDAR (Abre menú)
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _mostrarOpcionesGuardado(context),
-                          icon: Icon(
-                            _isPendiente
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
-                            color: _isPendiente ? primaryPurple : Colors.black,
-                            size: 20,
-                          ),
-                          label: Text(
-                            "Guardar",
-                            style: TextStyle(
-                              color: _isPendiente
-                                  ? primaryPurple
-                                  : Colors.black,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(
-                              color: _isPendiente
-                                  ? primaryPurple
-                                  : Colors.grey[300]!,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      // Botón VER EN MAPA
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => Mapa(lugar: lugar),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.map_outlined,
-                            size: 20,
-                            color: Colors.black,
-                          ),
-                          label: const Text(
-                            "Ver Mapa",
-                            style: TextStyle(color: Colors.black),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(color: Colors.grey[300]!),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      // Botón IR (Navegación Interna)
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => Mapa(
-                                  lugar: lugar,
-                                  startNavigation: true,
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.navigation,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          label: const Text(
-                            "Ir",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryPurple,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
-                  const SizedBox(height: 30),
-                  const Divider(),
-                  const SizedBox(height: 10),
-
-                  // --- SECCIÓN DE RESEÑAS ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Reseñas",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      TextButton.icon(
-                        onPressed: _postReview,
-                        icon: const Icon(Icons.rate_review, size: 18),
-                        label: const Text("Opinar"),
-                      ),
-                    ],
-                  ),
-                  
-                  if (_loadingReviews)
-                    const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-                  else if (_reviews.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text("Sé el primero en opinar sobre este lugar.", style: TextStyle(color: Colors.grey)),
-                    )
-                  else
-                    ListView.builder(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _reviews.length,
-                      itemBuilder: (context, index) {
-                        final review = _reviews[index];
-                        return ListTile(
-                          leading: const CircleAvatar(child: Icon(Icons.person, size: 16)),
-                          title: Text(review['usuario_username'] ?? 'Usuario'),
-                          subtitle: Text(review['texto'] ?? ''),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text("${review['calificacion']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                              const Icon(Icons.star, color: Colors.amber, size: 16),
-                            ],
-                          ),
-                        );
-                      },
+                  // Botón Favorito Rápido (Top Right)
+                  Positioned(
+                    top: 40,
+                    right: 16,
+                    child: _buildCircleBtn(
+                      icon: _isFavorito ? Icons.favorite : Icons.favorite_border,
+                      colorIcon: _isFavorito ? Colors.red : Colors.black,
+                      onTap: () => _toggleStatus('FAV', !_isFavorito),
                     ),
-
-                  const SizedBox(height: 40),
+                  ),
                 ],
               ),
-            ),
-          ],
+      
+              // --- 2. CONTENIDO ---
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (lugar.categorias.isNotEmpty)
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 4.0,
+                        children: lugar.categorias.map((categoria) {
+                          return Chip(
+                            label: Text(categoria.nombre),
+                            backgroundColor: Colors.grey[200],
+                            labelStyle: const TextStyle(color: Colors.black54),
+                          );
+                        }).toList(),
+                      )
+                    else
+                      Chip(
+                        label: const Text("General"),
+                        backgroundColor: Colors.grey[200],
+                        labelStyle: const TextStyle(color: Colors.black54),
+                      ),
+                    const SizedBox(height: 16),
+      
+                    Text(
+                      lugar.nombre,
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+      
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 20),
+                        const SizedBox(width: 4),
+                        Text(
+                          "(${_reviews.length} reseñas)", 
+                          style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                        ),
+                        const Spacer(),
+                        if (_isVisitado)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green[50],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.check, size: 14, color: Colors.green),
+                                SizedBox(width: 4),
+                                Text(
+                                  "Visitado",
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+      
+                    const Text(
+                      "Descripción",
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      lugar.descripcion,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[700],
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+      
+                    if (lugar.direccionCompleta != null) ...[
+                      _buildInfoRow(
+                        Icons.location_on_outlined,
+                        "Dirección",
+                        lugar.direccionCompleta!,
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                    
+                    if (lugar.horarios != null) ...[
+                      _buildInfoRow(
+                        Icons.access_time,
+                        "Horarios",
+                        lugar.horarios!,
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+      
+                    if (lugar.contacto != null) ...[
+                        _buildInfoRow(
+                        Icons.phone_outlined,
+                        "Contacto",
+                        lugar.contacto!,
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+      
+                    // --- 3. BOTONES DE ACCIÓN ---
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _mostrarOpcionesGuardado(context),
+                            icon: Icon(
+                              _isPendiente
+                                  ? Icons.bookmark
+                                  : Icons.bookmark_border,
+                              color: _isPendiente ? primaryPurple : Colors.black,
+                              size: 20,
+                            ),
+                            label: Text(
+                              "Guardar",
+                              style: TextStyle(
+                                color: _isPendiente
+                                    ? primaryPurple
+                                    : Colors.black,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: BorderSide(
+                                color: _isPendiente
+                                    ? primaryPurple
+                                    : Colors.grey[300]!,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+      
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => Mapa(lugar: lugar),
+                                ),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.map_outlined,
+                              size: 20,
+                              color: Colors.black,
+                            ),
+                            label: const Text(
+                              "Ver Mapa",
+                              style: TextStyle(color: Colors.black),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: BorderSide(color: Colors.grey[300]!),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+      
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => Mapa(
+                                    lugar: lugar,
+                                    startNavigation: true,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.navigation,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            label: const Text(
+                              "Ir",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryPurple,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 30),
+                    const Divider(),
+                    const SizedBox(height: 10),
+      
+                    // --- SECCIÓN DE RESEÑAS ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Reseñas",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        TextButton.icon(
+                          onPressed: _postReview,
+                          icon: const Icon(Icons.rate_review, size: 18),
+                          label: const Text("Opinar"),
+                        ),
+                      ],
+                    ),
+                    
+                    if (_loadingReviews)
+                      const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+                    else if (_reviews.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Text("Sé el primero en opinar sobre este lugar.", style: TextStyle(color: Colors.grey)),
+                      )
+                    else
+                      ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _reviews.length,
+                        itemBuilder: (context, index) {
+                          final review = _reviews[index];
+                          return ListTile(
+                            leading: const CircleAvatar(child: Icon(Icons.person, size: 16)),
+                            title: Text(review['usuario_username'] ?? 'Usuario'),
+                            subtitle: Text(review['texto'] ?? ''),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text("${review['calificacion']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                const Icon(Icons.star, color: Colors.amber, size: 16),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+      
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // Widget auxiliar para botones redondos flotantes
   Widget _buildCircleBtn({
     required IconData icon,
     required VoidCallback onTap,
@@ -631,7 +636,6 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
     );
   }
 
-  // Widget auxiliar para filas de información
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
