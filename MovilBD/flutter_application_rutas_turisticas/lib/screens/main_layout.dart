@@ -4,6 +4,8 @@ import 'package:flutter_application_rutas_turisticas/screens/mapa.dart';
 import 'package:flutter_application_rutas_turisticas/screens/rutas.dart';
 import 'package:flutter_application_rutas_turisticas/screens/favoritos.dart';
 import 'package:flutter_application_rutas_turisticas/screens/perfil.dart';
+import 'package:flutter_application_rutas_turisticas/screens/feed_screen.dart'; // Nuevo Feed
+import 'package:flutter_application_rutas_turisticas/screens/create_post.dart'; // Nuevo Post
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -16,19 +18,27 @@ class _MainLayoutState extends State<MainLayout> {
   // Índice de la pestaña seleccionada
   int _selectedIndex = 0;
 
-  // --- CORRECCIÓN AQUÍ ---
-  // Cambiamos 'static const' por 'final List<Widget>'.
-  // Esto permite que las pantallas cambien o reciban argumentos sin dar error.
   final List<Widget> _widgetOptions = [
-    const Home(), // Índice 0
-    const Rutas(), // Índice 1
-    const Mapa(), // Índice 2
-    const Favoritos(), // Índice 3
-    const Perfil(), // Índice 4
+    const FeedScreen(), // 0. Inicio (Reels)
+    const Mapa(),       // 1. Mapa (Antes Explorar)
+    const SizedBox(),   // 2. Publicar (Placeholder)
+    const Rutas(),      // 3. Rutas
+    const Perfil(),     // 4. Perfil
   ];
 
   // Función que se llama cuando se toca un ícono de la barra
   void _onItemTapped(int index) {
+    if (index == 2) {
+      // Si toca el botón central (+), abrimos la pantalla de crear post modalmente
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const CreatePostScreen()),
+      ).then((_) {
+        // Al regresar, tal vez refrescar feed?
+      });
+      return; 
+    }
+
     setState(() {
       _selectedIndex = index;
     });
@@ -37,9 +47,9 @@ class _MainLayoutState extends State<MainLayout> {
   @override
   Widget build(BuildContext context) {
     // Usamos el color púrpura de tu app
-    final Color activeColor = Theme.of(
-      context,
-    ).primaryColor; // Mejor usar el del tema
+    final Color activeColor = Theme.of(context).primaryColor; 
+    
+    // Check keyboard for visibility (optional polish)
 
     return Scaffold(
       // El body es la página seleccionada actualmente
@@ -53,14 +63,9 @@ class _MainLayoutState extends State<MainLayout> {
         // Los items (íconos y etiquetas) de la barra
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.public_outlined),
-            activeIcon: Icon(Icons.public),
-            label: 'Explorar',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.explore_outlined),
-            activeIcon: Icon(Icons.explore),
-            label: 'Rutas',
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Inicio',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.map_outlined),
@@ -68,9 +73,14 @@ class _MainLayoutState extends State<MainLayout> {
             label: 'Mapa',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.star_border),
-            activeIcon: Icon(Icons.star),
-            label: 'Favoritos',
+            icon: Icon(Icons.add_circle, size: 40, color: Colors.purple),
+            activeIcon: Icon(Icons.add_circle, size: 40, color: Colors.purple),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.directions_bus_outlined),
+            activeIcon: Icon(Icons.directions_bus),
+            label: 'Rutas',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
@@ -90,3 +100,4 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 }
+

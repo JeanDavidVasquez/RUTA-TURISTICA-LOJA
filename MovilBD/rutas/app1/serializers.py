@@ -2,7 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
 from .models import (
     Usuario, Resena, Categoria, Lugar, 
-    Favorito, Evento, Ruta, Ruta_Guardada, Ruta_Lugar
+    Favorito, Evento, Ruta, Ruta_Guardada, Ruta_Lugar,
+    Publicacion, AdministradorLugar, Comentario
 )
 
 # --- Serializadores Base ---
@@ -223,3 +224,41 @@ class Ruta_LugarSerializer(serializers.ModelSerializer):
             'id', 'orden', 'fechaGuardado', 'ruta', 'ruta_nombre', 
             'lugar', 'lugar_nombre', 'tiempo_sugerido_minutos', 'comentario'
         ]
+
+# --- NUEVOS SERIALIZADORES (Social) ---
+
+class PublicacionSerializer(serializers.ModelSerializer):
+    usuario_username = serializers.CharField(source='usuario.username', read_only=True)
+    usuario_foto = serializers.CharField(source='usuario.varFoto', read_only=True) # Para mostrar avatar
+    lugar_nombre = serializers.CharField(source='lugar.nombre', read_only=True)
+    es_propietario = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Publicacion
+        fields = [
+            'id', 'usuario', 'usuario_username', 'usuario_foto',
+            'lugar', 'lugar_nombre',
+            'tipo', 'archivo_media', 'descripcion', 'fecha', 'es_visible',
+            'es_propietario'
+        ]
+        read_only_fields = ['fecha', 'es_visible', 'es_propietario'] 
+
+    def get_es_propietario(self, obj):
+        # Verifica si el autor de la publicacion administra el lugar
+        from .models import AdministradorLugar
+        return AdministradorLugar.objects.filter(usuario=obj.usuario, lugar=obj.lugar).exists() 
+
+class AdministradorLugarSerializer(serializers.ModelSerializer):
+    lugar_nombre = serializers.CharField(source='lugar.nombre', read_only=True)
+    
+    class Meta:
+        model = AdministradorLugar
+        fields = ['id', 'usuario', 'lugar', 'lugar_nombre', 'fecha_asignacion']
+
+class ComentarioSerializer(serializers.ModelSerializer):
+    usuario_username = serializers.CharField(source='usuario.username', read_only=True)
+    usuario_foto = serializers.CharField(source='usuario.varFoto', read_only=True)
+    
+    class Meta:
+        model = Comentario
+        fields = '__all__'

@@ -3,7 +3,8 @@ from django import forms
 from .models import (
     Usuario, Resena, Categoria, Lugar, Favorito,
     Evento, Ruta, Ruta_Guardada, Ruta_Lugar,
-    Provincia, Canton, Parroquia
+    Provincia, Canton, Parroquia,
+    AdministradorLugar, Publicacion
 )
 
 # --- INLINES ---
@@ -130,3 +131,24 @@ admin.site.register(Provincia)
 admin.site.register(Canton)
 admin.site.register(Parroquia)
 admin.site.register(Categoria)
+
+# --- NUEVOS ADMINS (Social & Gestión) ---
+
+@admin.register(AdministradorLugar)
+class AdministradorLugarAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'lugar', 'fecha_asignacion')
+    search_fields = ('usuario__username', 'usuario__email', 'lugar__nombre')
+    autocomplete_fields = ['usuario', 'lugar'] # Requiere search_fields en Usuario admin y Lugar admin
+    list_filter = ('fecha_asignacion',)
+
+@admin.register(Publicacion)
+class PublicacionAdmin(admin.ModelAdmin):
+    list_display = ('get_summary', 'tipo', 'usuario', 'lugar', 'fecha', 'es_visible')
+    list_filter = ('tipo', 'es_visible', 'fecha')
+    search_fields = ('usuario__username', 'lugar__nombre', 'descripcion')
+    autocomplete_fields = ['usuario', 'lugar']
+    readonly_fields = ('fecha',)
+
+    def get_summary(self, obj):
+        return f"{obj.tipo} - {obj.lugar.nombre}"
+    get_summary.short_description = 'Resumen'

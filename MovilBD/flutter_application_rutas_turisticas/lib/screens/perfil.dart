@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/usuario.dart';
+import '../models/lugar.dart'; // Import para Lugar
 import 'editar_perfil.dart';
+import 'favoritos.dart'; // Import Favorites
+import '../models/publicacion.dart';
+import 'post_detail.dart';
 
 class Perfil extends StatefulWidget {
   const Perfil({super.key});
@@ -14,6 +18,9 @@ class _PerfilState extends State<Perfil> {
   final ApiService _apiService = ApiService();
   late Future<Usuario?> _futureUsuario;
   late Future<Map<String, dynamic>> _futureStats;
+  
+  // Lista de lugares administrados
+  List<Lugar> _managedPlaces = [];
 
   @override
   void initState() {
@@ -21,11 +28,19 @@ class _PerfilState extends State<Perfil> {
     _loadData();
   }
 
-  void _loadData() {
+  void _loadData() async {
     int? userId = ApiService.currentUserId;
     if (userId != null) {
       _futureUsuario = _apiService.getUserProfile(userId);
       _futureStats = _apiService.getUserStats(userId);
+      
+      // Cargar lugares administrados
+      try {
+        final places = await _apiService.getManagedPlaces(userId);
+        if (mounted) setState(() => _managedPlaces = places);
+      } catch (e) {
+        print("Error loading managed places: $e");
+      }
     } else {
       _futureUsuario = Future.value(null);
       _futureStats = Future.value({'favoritos': 0, 'visitados': 0, 'rutas': 0});
@@ -54,207 +69,106 @@ class _PerfilState extends State<Perfil> {
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 children: [
-                  // --- 1. HEADER ---
-                  const SizedBox(height: 20),
-                  Row(
+                   // --- 1. HEADER ---
+                   const SizedBox(height: 20),
+                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        "Mi Perfil",
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1A1A1A),
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: IconButton(
-                          onPressed: () {},
-                          icon: const Icon(Icons.settings_outlined, color: Colors.black87),
-                        ),
-                      ),
+                      const Text("Mi Perfil", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Color(0xFF1A1A1A))),
+                      const Icon(Icons.settings_outlined, color: Colors.black87), // Simple icon
                     ],
-                  ),
+                   ),
+                   const SizedBox(height: 30),
 
-                  const SizedBox(height: 30),
-
-                  // --- 2. SECCIÓN DE USUARIO (CENTRADO) ---
-                  Center(
-                    child: Column(
-                      children: [
-                        // Avatar
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 15,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: CircleAvatar(
+                   // --- 2. USUARIO ---
+                   Center(
+                     child: Column(
+                       children: [
+                         // Avatar
+                         CircleAvatar(
                             radius: 50,
                             backgroundColor: const Color(0xFF6C5CE7),
                             backgroundImage: usuario?.urlFotoPerfil != null
                                 ? NetworkImage(usuario!.urlFotoPerfil!)
                                 : null,
                             child: usuario?.urlFotoPerfil == null
-                                ? Text(
-                              iniciales,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
+                                ? Text(iniciales, style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold))
                                 : null,
                           ),
-                        ),
-                        const SizedBox(height: 16),
+                         const SizedBox(height: 16),
+                         Text(nombre, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                         Text(email, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                         const SizedBox(height: 10),
+                         TextButton(
+                           onPressed: () async {
+                              if (usuario != null) {
+                                await Navigator.push(context, MaterialPageRoute(builder: (context) => EditarPerfilScreen(usuario: usuario)));
+                                setState(() => _loadData());
+                              }
+                           },
+                           child: const Text("Editar Perfil"),
+                         )
+                       ],
+                     ),
+                   ),
 
-                        // --- CAMBIO: NOMBRE Y CORREO PARALELOS Y CENTRADOS ---
-                        // Usamos MainAxisSize.min para que la fila abrace el contenido
-                        // y quede perfectamente centrada en la pantalla.
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              nombre,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2D3436),
-                              ),
-                            ),
-
-                            // Separador Vertical (Línea)
-                            Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 12),
-                              height: 16,
-                              width: 1.5,
-                              color: Colors.grey[300],
-                            ),
-
-                            Text(
-                              email,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                        // -------------------------------------------
-
-                        const SizedBox(height: 20),
-
-                        // Botón Editar Pequeño
-                        InkWell(
-                          onTap: () async {
-                            if (usuario != null) {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                        EditarPerfilScreen(usuario: usuario)),
-                              );
-                              setState(() {
-                                _loadData();
-                              });
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6C5CE7).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              "Editar Perfil",
-                              style: TextStyle(
-                                color: Color(0xFF6C5CE7),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // --- 3. TARJETA DE ESTADÍSTICAS ---
-                  FutureBuilder<Map<String, dynamic>>(
+                   // --- 3. ESTADÍSTICAS ---
+                   const SizedBox(height: 20),
+                   FutureBuilder<Map<String, dynamic>>(
                       future: _futureStats,
                       builder: (context, statsSnapshot) {
-                        final stats = statsSnapshot.data ??
-                            {'favoritos': 0, 'visitados': 0, 'rutas': 0};
-
+                        final stats = statsSnapshot.data ?? {'favoritos': 0, 'visitados': 0, 'rutas': 0};
                         return Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF6C5CE7), Color(0xFFA29BFE)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF6C5CE7).withOpacity(0.4),
-                                blurRadius: 12,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
+                            gradient: const LinearGradient(colors: [Color(0xFF6C5CE7), Color(0xFFA29BFE)]),
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               _buildWhiteStatItem("Visitados", stats['visitados'].toString()),
-                              Container(width: 1, height: 40, color: Colors.white.withOpacity(0.3)),
                               _buildWhiteStatItem("Rutas", stats['rutas'].toString()),
-                              Container(width: 1, height: 40, color: Colors.white.withOpacity(0.3)),
                               _buildWhiteStatItem("Favoritos", stats['favoritos'].toString()),
                             ],
                           ),
                         );
                       }),
+                   
+                   // --- 4. GESTIÓN DE NEGOCIO (SI ES ADMIN) ---
+                   if (_managedPlaces.isNotEmpty) ...[
+                      const SizedBox(height: 30),
+                      const Align(alignment: Alignment.centerLeft, child: Text("Mi Negocio", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                      const SizedBox(height: 10),
+                      
+                      // Tarjeta de Admin
+                      Container(
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]),
+                        child: ListTile(
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                            child: const Icon(Icons.business_center, color: Colors.orange),
+                          ),
+                          title: Text("Administrar: ${_managedPlaces.first.nombre}"),
+                          subtitle: const Text("Editar info, ver estadísticas"),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                             // Aquí iría al Dashboard del Negocio (Editar Info)
+                             // Por ahora solo mostramos un SnackBar o Dialog
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Panel de Gestión: Próximamente")));
+                          },
+                        ),
+                      ),
+                   ],
 
-                  const SizedBox(height: 30),
 
-                  // --- 4. MENÚ EN PARALELO (GRID) ---
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      "General",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  GridView.count(
+                   // --- 5. MENU GRID ---
+                   const SizedBox(height: 30),
+                   const Align(alignment: Alignment.centerLeft, child: Text("General", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                   const SizedBox(height: 16),
+                   
+                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     crossAxisCount: 2,
@@ -263,65 +177,42 @@ class _PerfilState extends State<Perfil> {
                     childAspectRatio: 1.1,
                     children: [
                       _buildGridButton(
-                        icon: Icons.notifications_none_rounded,
-                        title: "Notificaciones",
+                        icon: Icons.star,
+                        title: "Favoritos",
                         color: Colors.orange,
-                        onTap: () {},
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const Favoritos())),
                       ),
                       _buildGridButton(
-                        icon: Icons.rate_review_outlined,
+                        icon: Icons.rate_review,
                         title: "Mis Reseñas",
                         color: Colors.pinkAccent,
                         onTap: () => Navigator.pushNamed(context, '/mis_resenas'),
                       ),
                       _buildGridButton(
-                        icon: Icons.privacy_tip_outlined,
-                        title: "Privacidad",
-                        color: Colors.teal,
-                        onTap: () {},
+                        icon: Icons.image,
+                        title: "Mis Publicaciones",
+                        color: Colors.purple,
+                        onTap: () {
+                          if (ApiService.currentUserId != null) {
+                            Navigator.push(
+                              context, 
+                              MaterialPageRoute(builder: (_) => UserPostsScreen(userId: ApiService.currentUserId!))
+                            );
+                          }
+                        },
                       ),
                       _buildGridButton(
-                        icon: Icons.help_outline_rounded,
-                        title: "Ayuda",
-                        color: Colors.blueAccent,
-                        onTap: () {},
+                        icon: Icons.logout,
+                        title: "Cerrar Sesión",
+                        color: Colors.red,
+                        onTap: () {
+                          ApiService.currentUserId = null;
+                          Navigator.of(context).pushReplacementNamed('/login');
+                        },
                       ),
                     ],
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: TextButton(
-                      onPressed: () {
-                        ApiService.currentUserId = null;
-                        Navigator.of(context).pushReplacementNamed('/login');
-                      },
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFF5F5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.logout_rounded, color: Colors.redAccent),
-                          SizedBox(width: 8),
-                          Text(
-                            "Cerrar Sesión",
-                            style: TextStyle(
-                              color: Colors.redAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
+                   ),
+                   const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -331,77 +222,82 @@ class _PerfilState extends State<Perfil> {
     );
   }
 
-  Widget _buildWhiteStatItem(String count, String label) {
-    return Column(
-      children: [
-        Text(
-          count,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
+  Widget _buildWhiteStatItem(String label, String count) {
+    return Column(children: [Text(count, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)), Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12))]);
   }
 
-  Widget _buildGridButton({
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onTap,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 28),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Color(0xFF2D3436),
-                ),
-              ),
-            ],
-          ),
+  Widget _buildGridButton({required IconData icon, required String title, required Color color, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))]),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: color, size: 28)),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class UserPostsScreen extends StatefulWidget {
+  final int userId;
+  const UserPostsScreen({super.key, required this.userId});
+
+  @override
+  State<UserPostsScreen> createState() => _UserPostsScreenState();
+}
+
+class _UserPostsScreenState extends State<UserPostsScreen> {
+  final ApiService _apiService = ApiService();
+  List<Publicacion> _posts = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPosts();
+  }
+
+  Future<void> _loadPosts() async {
+    try {
+      final posts = await _apiService.fetchPublicaciones(usuarioId: widget.userId);
+      if (mounted) setState(() { _posts = posts; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Mis Publicaciones")),
+      body: _loading 
+        ? const Center(child: CircularProgressIndicator())
+        : _posts.isEmpty 
+           ? const Center(child: Text("No has realizado publicaciones"))
+           : ListView.builder(
+               itemCount: _posts.length,
+               itemBuilder: (context, index) {
+                 final post = _posts[index];
+                 return ListTile(
+                   leading: post.archivoMedia != null 
+                     ? Image.network(_apiService.getImageUrl(post.archivoMedia)!, width: 50, height: 50, fit: BoxFit.cover, errorBuilder: (c,e,s)=>const Icon(Icons.image)) 
+                     : const Icon(Icons.article),
+                   title: Text(post.descripcion ?? "Sin descripción", maxLines: 1, overflow: TextOverflow.ellipsis),
+                   subtitle: Text("En: ${post.lugarNombre}"),
+                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                   onTap: () {
+                     Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)))
+                       .then((_) => _loadPosts()); // Reload on return (in case of delete)
+                   },
+                 );
+               },
+             ),
     );
   }
 }

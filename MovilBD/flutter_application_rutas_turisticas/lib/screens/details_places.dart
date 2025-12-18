@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_rutas_turisticas/screens/mapa.dart';
 import '../models/lugar.dart';
+import '../models/publicacion.dart'; // Import Publicacion
 import '../services/api_service.dart';
+import 'post_detail.dart';
 
 class DetalleLugarScreen extends StatefulWidget {
   final Lugar lugar;
   // NUEVO: Recibimos el estado inicial desde el Home
   final bool? initialFavState; 
-
+  
   const DetalleLugarScreen({
     super.key, 
     required this.lugar,
@@ -31,13 +33,16 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   // Reseñas
   List<dynamic> _reviews = [];
   bool _loadingReviews = true;
+  
+  // Vivencias (Novedades)
+  List<Publicacion> _novedades = [];
+  bool _loadingNovedades = true;
 
   @override
   void initState() {
     super.initState();
     _lugar = widget.lugar;
     
-    // NUEVO: Inicializamos con el dato que viene del Home para que no parpadee
     if (widget.initialFavState != null) {
       _isFavorito = widget.initialFavState!;
     }
@@ -45,10 +50,25 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
     _checkStatus();
     _loadFullDetails();
     _loadReviews();
+    _loadNovedades();
+  }
+  
+  Future<void> _loadNovedades() async {
+    try {
+      final posts = await _apiService.fetchPublicaciones(lugarId: _lugar.id);
+      if (mounted) {
+        setState(() {
+          _novedades = posts;
+          _loadingNovedades = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading novedades: $e");
+      if (mounted) setState(() => _loadingNovedades = false);
+    }
   }
 
   // --- Método para manejar el regreso al Home ---
-  // Esto devuelve el estado actualizado de _isFavorito al Home
   void _onPop() {
     Navigator.pop(context, _isFavorito);
   }
@@ -73,7 +93,6 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
       final status = await _apiService.checkFavoritoStatus(_lugar.id);
       if (mounted) {
         setState(() {
-          // Si la API devuelve null o falla, mantenemos el estado local si ya lo teníamos
           if (status['FAV'] != null) _isFavorito = status['FAV']!;
           _isPendiente = status['PEND'] ?? false;
           _isVisitado = status['VISIT'] ?? false;
@@ -171,7 +190,6 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   }
 
   Future<void> _toggleStatus(String tipo, bool isActive) async {
-    // Optimistic update
     setState(() {
       if (tipo == 'FAV') _isFavorito = isActive;
       if (tipo == 'PEND') _isPendiente = isActive;
@@ -180,9 +198,7 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
 
     try {
       await _apiService.toggleFavorito(_lugar.id, tipo, isActive);
-      // Éxito: Se guardó en la base
     } catch (e) {
-      // Revertir si error
       print("Error toggling status: $e");
       if (mounted) {
         setState(() {
@@ -296,12 +312,11 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
     final Color primaryPurple = Theme.of(context).primaryColor;
     final lugar = _lugar;
 
-    // Usamos PopScope para interceptar el botón físico de atrás en Android
     return PopScope(
-      canPop: false, // Bloqueamos el pop automático para hacerlo manual
+      canPop: false, 
       onPopInvoked: (didPop) {
         if (didPop) return;
-        _onPop(); // Llamamos a nuestra función que devuelve datos
+        _onPop(); 
       },
       child: Scaffold(
         body: SingleChildScrollView(
@@ -322,16 +337,14 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                           const Icon(Icons.image, size: 100, color: Colors.grey),
                     ),
                   ),
-                  // Botón Atrás (ACTUALIZADO para usar _onPop)
                   Positioned(
                     top: 40,
                     left: 16,
                     child: _buildCircleBtn(
                       icon: Icons.arrow_back,
-                      onTap: _onPop, // <--- CAMBIO IMPORTANTE
+                      onTap: _onPop, 
                     ),
                   ),
-                  // Botón Favorito Rápido (Top Right)
                   Positioned(
                     top: 40,
                     right: 16,
@@ -387,26 +400,13 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                         const Spacer(),
                         if (_isVisitado)
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green[50],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(4)),
                             child: const Row(
                               children: [
                                 Icon(Icons.check, size: 14, color: Colors.green),
                                 SizedBox(width: 4),
-                                Text(
-                                  "Visitado",
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
+                                Text("Visitado", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
                               ],
                             ),
                           ),
@@ -421,38 +421,22 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                     const SizedBox(height: 8),
                     Text(
                       lugar.descripcion,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[700],
-                        height: 1.5,
-                      ),
+                      style: TextStyle(fontSize: 16, color: Colors.grey[700], height: 1.5),
                     ),
                     const SizedBox(height: 32),
       
                     if (lugar.direccionCompleta != null) ...[
-                      _buildInfoRow(
-                        Icons.location_on_outlined,
-                        "Dirección",
-                        lugar.direccionCompleta!,
-                      ),
+                      _buildInfoRow(Icons.location_on_outlined, "Dirección", lugar.direccionCompleta!),
                       const SizedBox(height: 20),
                     ],
                     
                     if (lugar.horarios != null) ...[
-                      _buildInfoRow(
-                        Icons.access_time,
-                        "Horarios",
-                        lugar.horarios!,
-                      ),
+                      _buildInfoRow(Icons.access_time, "Horarios", lugar.horarios!),
                       const SizedBox(height: 20),
                     ],
       
                     if (lugar.contacto != null) ...[
-                        _buildInfoRow(
-                        Icons.phone_outlined,
-                        "Contacto",
-                        lugar.contacto!,
-                      ),
+                      _buildInfoRow(Icons.phone_outlined, "Contacto", lugar.contacto!),
                       const SizedBox(height: 32),
                     ],
       
@@ -462,31 +446,12 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _mostrarOpcionesGuardado(context),
-                            icon: Icon(
-                              _isPendiente
-                                  ? Icons.bookmark
-                                  : Icons.bookmark_border,
-                              color: _isPendiente ? primaryPurple : Colors.black,
-                              size: 20,
-                            ),
-                            label: Text(
-                              "Guardar",
-                              style: TextStyle(
-                                color: _isPendiente
-                                    ? primaryPurple
-                                    : Colors.black,
-                              ),
-                            ),
+                            icon: Icon(_isPendiente ? Icons.bookmark : Icons.bookmark_border, color: _isPendiente ? primaryPurple : Colors.black, size: 20),
+                            label: Text("Guardar", style: TextStyle(color: _isPendiente ? primaryPurple : Colors.black)),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: BorderSide(
-                                color: _isPendiente
-                                    ? primaryPurple
-                                    : Colors.grey[300]!,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                              side: BorderSide(color: _isPendiente ? primaryPurple : Colors.grey[300]!),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -495,28 +460,14 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => Mapa(lugar: lugar),
-                                ),
-                              );
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => Mapa(lugar: lugar)));
                             },
-                            icon: const Icon(
-                              Icons.map_outlined,
-                              size: 20,
-                              color: Colors.black,
-                            ),
-                            label: const Text(
-                              "Ver Mapa",
-                              style: TextStyle(color: Colors.black),
-                            ),
+                            icon: const Icon(Icons.map_outlined, size: 20, color: Colors.black),
+                            label: const Text("Ver Mapa", style: TextStyle(color: Colors.black)),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               side: BorderSide(color: Colors.grey[300]!),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -525,32 +476,15 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => Mapa(
-                                    lugar: lugar,
-                                    startNavigation: true,
-                                  ),
-                                ),
-                              );
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => Mapa(lugar: lugar, startNavigation: true)));
                             },
-                            icon: const Icon(
-                              Icons.navigation,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                            label: const Text(
-                              "Ir",
-                              style: TextStyle(color: Colors.white),
-                            ),
+                            icon: const Icon(Icons.navigation, color: Colors.white, size: 20),
+                            label: const Text("Ir", style: TextStyle(color: Colors.white)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryPurple,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -559,20 +493,76 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                     const SizedBox(height: 30),
                     const Divider(),
                     const SizedBox(height: 10),
+
+                    // --- NUEVA SECCIÓN: VIVENCIAS (FEED) ---
+                    if (!_loadingNovedades && _novedades.isNotEmpty) ...[
+                      const Text("Vivencias", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 220,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _novedades.length,
+                          itemBuilder: (context, index) {
+                            final post = _novedades[index];
+                            return GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => PostDetailScreen(post: post),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 300, // Fixed width card
+                                margin: const EdgeInsets.only(right: 16),
+                                child: Card(
+                                  clipBehavior: Clip.antiAlias,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  child: Stack(
+                                    children: [
+                                      if (post.archivoMedia != null)
+                                        Positioned.fill(
+                                          child: Image.network(
+                                            _apiService.getImageUrl(post.archivoMedia)!, 
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (c,e,s) => Container(color: Colors.grey[300]),
+                                          ),
+                                        ),
+                                      Container(
+                                         decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withOpacity(0.8)])),
+                                      ),
+                                      Positioned(
+                                        bottom: 12, left: 12, right: 12,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                             Text(post.usuarioUsername, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                             Text(post.descripcion ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                          ],
+                                        ),
+                                      )
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      const Divider(),
+                      const SizedBox(height: 10),
+                    ],
       
                     // --- SECCIÓN DE RESEÑAS ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          "Reseñas",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        TextButton.icon(
-                          onPressed: _postReview,
-                          icon: const Icon(Icons.rate_review, size: 18),
-                          label: const Text("Opinar"),
-                        ),
+                        const Text("Reseñas", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        TextButton.icon(onPressed: _postReview, icon: const Icon(Icons.rate_review, size: 18), label: const Text("Opinar")),
                       ],
                     ),
                     
@@ -617,20 +607,12 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
     );
   }
 
-  Widget _buildCircleBtn({
-    required IconData icon,
-    required VoidCallback onTap,
-    Color colorIcon = Colors.black,
-  }) {
+  Widget _buildCircleBtn({required IconData icon, required VoidCallback onTap, Color colorIcon = Colors.black}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.9),
-          shape: BoxShape.circle,
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
-        ),
+        decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)]),
         child: Icon(icon, color: colorIcon, size: 24),
       ),
     );
@@ -646,22 +628,14 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              Text(
-                value,
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
+              Text(value, style: TextStyle(fontSize: 16, color: Colors.grey[700])),
             ],
           ),
         ),
       ],
     );
   }
+
 }

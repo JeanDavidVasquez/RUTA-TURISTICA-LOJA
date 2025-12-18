@@ -52,6 +52,18 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             'rutas': route_count
         })
 
+    @action(detail=True, methods=['get'])
+    def managed_places(self, request, pk=None):
+        """
+        Devuelve la lista de lugares que este usuario administra.
+        """
+        usuario = self.get_object()
+        admins = AdministradorLugar.objects.filter(usuario=usuario)
+        lugares = [admin.lugar for admin in admins]
+        # Usamos el LugarSerializer para devolver la data completa del lugar
+        serializer = LugarSerializer(lugares, many=True)
+        return Response(serializer.data)
+
 class CategoriaViewSet(viewsets.ModelViewSet):
     """
     API endpoint que permite ver y editar Categorias.
@@ -175,3 +187,77 @@ def load_parroquias(request):
     canton_id = request.GET.get('canton')
     parroquias = Parroquia.objects.filter(canton_id=canton_id).order_by('nombre')
     return JsonResponse(list(parroquias.values('id', 'nombre')), safe=False)
+
+# --- NUEVAS VISTAS (Social) ---
+
+class PublicacionViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para el Feed Social (Reels/Fotos).
+    Filtrar por: ?lugar=1
+    """
+    queryset = Publicacion.objects.filter(es_visible=True).order_by('-fecha')
+    serializer_class = PublicacionSerializer
+
+    def get_queryset(self):
+        queryset = Publicacion.objects.filter(es_visible=True).order_by('-fecha')
+        lugar_id = self.request.query_params.get('lugar')
+        usuario_id = self.request.query_params.get('usuario')
+        tipo = self.request.query_params.get('tipo')
+
+        if lugar_id:
+            queryset = queryset.filter(lugar__id=lugar_id)
+        if usuario_id:
+            queryset = queryset.filter(usuario__id=usuario_id)
+        if tipo:
+            queryset = queryset.filter(tipo=tipo)
+        
+        return queryset
+
+    def perform_create(self, serializer):
+        # Lógica de asignación de tipo automática
+        data = self.request.data
+        usuario_id = data.get('usuario')
+        lugar_id = data.get('lugar')
+        tipo_solicitado = data.get('tipo', 'EXPERIENCIA')
+
+        # Verificar si es administrador
+        es_admin = AdministradorLugar.objects.filter(usuario_id=usuario_id, lugar_id=lugar_id).exists()
+
+        if es_admin:
+            # Si es admin, permitimos PROMOCION o EVENTO. Si manda EXPERIENCIA, lo dejamos.
+            # Pero por defecto, si no manda nada, o si manda algo raro, confiamos en lo que manda o default.
+            pass 
+        else:
+            # Si NO es admin, forzamos EXPERIENCIA
+            if tipo_solicitado != 'EXPERIENCIA':
+                # Podríamos lanzar error, o simplemente sobrescribir silenciosamente
+                serializer.save(tipo='EXPERIENCIA')
+                return
+
+        serializer.save()
+
+class AdministradorLugarViewSet(viewsets.ModelViewSet):
+    """
+    Para verificar permisos.
+    Ej: ?usuario=ID -> Devuelve lista de lugares que administra.
+    """
+    queryset = AdministradorLugar.objects.all()
+    serializer_class = AdministradorLugarSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        usuario_id = self.request.query_params.get('usuario')
+        if usuario_id:
+            queryset = queryset.filter(usuario__id=usuario_id)
+        return queryset
+
+class ComentarioViewSet(viewsets.ModelViewSet):
+    queryset = Comentario.objects.all().order_by('fecha_creacion')
+    serializer_class = ComentarioSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        publicacion_id = self.request.query_params.get('publicacion')
+        if publicacion_id:
+            queryset = queryset.filter(publicacion__id=publicacion_id)
+        return queryset

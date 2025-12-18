@@ -544,15 +544,28 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                       fontSize: 16,
                     ),
                   ),
-                  if (rutaLugar.tiempoSugeridoMinutos > 0)
+                  if (rutaLugar.tiempoSugeridoMinutos > 0) ...[
                     Text(
                       "Tiempo sugerido: ${rutaLugar.tiempoSugeridoMinutos} min",
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                      style: const TextStyle(
+                        color: Colors.blue,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (rutaLugar.tiempoSugeridoMinutos >= 60)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2.0),
+                        child: Text(
+                          "Es tardado",
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                  ],
                   if (rutaLugar.comentario != null &&
                       rutaLugar.comentario!.isNotEmpty)
                     Padding(

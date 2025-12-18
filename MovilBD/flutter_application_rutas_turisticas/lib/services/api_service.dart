@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io'; // Para File
 import 'package:flutter/foundation.dart'; // Para kIsWeb
 import 'package:http/http.dart' as http;
 import '../models/ruta.dart';
@@ -6,6 +7,8 @@ import '../models/lugar.dart';
 import '../models/ruta_lugar.dart';
 import '../models/usuario.dart';
 import '../models/categoria.dart';
+import '../models/publicacion.dart';
+import '../models/comentario.dart';
 
 class ApiService {
   // Configuracion de URL Base
@@ -18,10 +21,10 @@ class ApiService {
       return 'http://127.0.0.1:8000/api';
     }
     // emulador Android:
-    return 'http://10.0.2.2:8000/api';
+    // return 'http://10.0.2.2:8000/api';
 
     // DISPOSITIVO FÍSICO:
-    // return 'http://192.168.1.105:8000/api';
+    return 'http://192.168.1.113:8000/api';
   }
 
   // Almacenamiento simple del ID de usuario en memoria (se pierde al reiniciar app)
@@ -521,10 +524,139 @@ class ApiService {
   Future<void> deleteReview(int reviewId) async {
     final response = await http.delete(
       Uri.parse('$baseUrl/resenas/$reviewId/'),
+      headers: {'Content-Type': 'application/json'},
     );
 
     if (response.statusCode != 204) {
       throw Exception('Failed to delete review: ${response.body}');
     }
+  }
+
+  // --- SOCIAL FEED & GESTIÓN ---
+
+  Future<List<Lugar>> getManagedPlaces(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/usuarios/$userId/managed_places/'));
+    
+    if (response.statusCode == 200) {
+      List<dynamic> body = jsonDecode(response.body);
+      return body.map((item) => Lugar.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load managed places');
+    }
+  }
+
+  Future<List<Publicacion>> fetchPublicaciones({int? lugarId, int? usuarioId, String? tipo}) async {
+    String query = '';
+    if (lugarId != null) query += 'lugar=$lugarId&';
+    if (usuarioId != null) query += 'usuario=$usuarioId&';
+    if (tipo != null) query += 'tipo=$tipo&';
+
+    final response = await http.get(Uri.parse('$baseUrl/publicaciones/?$query'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> body = jsonDecode(response.body);
+      return body.map((item) => Publicacion.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load publicaciones');
+    }
+  }
+
+  Future<void> createPublicacion({
+    required int usuarioId,
+    required int lugarId,
+    String? descripcion,
+    File? imageFile,
+    String? tipo,
+  }) async {
+    var uri = Uri.parse('$baseUrl/publicaciones/');
+    var request = http.MultipartRequest('POST', uri);
+
+    request.fields['usuario'] = usuarioId.toString();
+    request.fields['lugar'] = lugarId.toString();
+    if (descripcion != null) request.fields['descripcion'] = descripcion;
+    if (tipo != null) request.fields['tipo'] = tipo;
+
+    if (imageFile != null) {
+      var stream = http.ByteStream(imageFile.openRead());
+      var length = await imageFile.length();
+      
+      var multipartFile = http.MultipartFile(
+        'archivo_media',
+        stream,
+        length,
+        filename: imageFile.path.split('/').last,
+      );
+      request.files.add(multipartFile);
+    }
+
+    var response = await request.send();
+
+    if (response.statusCode != 201) {
+      // Leer respuesta para debug
+      var respStr = await response.stream.bytesToString();
+      throw Exception('Failed to create publicacion: $respStr');
+    }
+  }
+
+  Future<void> updatePublicacion(int id, Map<String, dynamic> data) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/publicaciones/$id/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update publicacion: ${response.body}');
+    }
+  }
+
+  Future<void> deletePublicacion(int id) async {
+    final response = await http.delete(Uri.parse('$baseUrl/publicaciones/$id/'));
+
+    if (response.statusCode != 204) {
+      throw Exception('Failed to delete publicacion: ${response.body}');
+    }
+  }
+
+  Future<List<Comentario>> fetchComentarios(int publicacionId) async {
+    final response = await http.get(Uri.parse('$baseUrl/comentarios/?publicacion=$publicacionId'));
+    if (response.statusCode == 200) {
+      List<dynamic> body = jsonDecode(response.body);
+      return body.map((item) => Comentario.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load comentarios');
+    }
+  }
+
+  Future<void> createComentario(int usuarioId, int publicacionId, String texto) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/comentarios/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'usuario': usuarioId,
+        'publicacion': publicacionId,
+        'texto': texto,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception('Failed to create comentario: ${response.body}');
+    }
+  }
+
+  String? getImageUrl(String? path) {
+    if (path == null) return null;
+    if (path.startsWith('http')) return path;
+    
+    String cleanBase = baseUrl.replaceAll('/api', '');
+    if (cleanBase.endsWith('/')) cleanBase = cleanBase.substring(0, cleanBase.length - 1);
+    
+    if (path.startsWith('/')) path = path.substring(1);
+    
+    if (path.startsWith('media/')) {
+       return "$cleanBase/$path";
+    }
+
+    return "$cleanBase/media/$path";
   }
 }

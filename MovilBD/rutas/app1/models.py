@@ -11,6 +11,10 @@ class Usuario(models.Model):
     varFoto = models.CharField(max_length=255, blank=True, null=True)
     fechaCreacion = models.DateTimeField(auto_now_add=True)
 
+    # --- NUEVO: Rol (Aunque se maneja por relación, un flag ayuda visualmente) ---
+    ROLES = [('TURISTA', 'Turista'), ('ADMIN', 'Admin App')]
+    rol = models.CharField(max_length=20, choices=ROLES, default='TURISTA')
+
     def __str__(self):
         return self.username
 
@@ -74,6 +78,20 @@ class Lugar(models.Model):
     def __str__(self):
         return self.nombre
 
+# --- NUEVO: Administrador de Lugar ---
+class AdministradorLugar(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='lugares_administrados')
+    lugar = models.ForeignKey(Lugar, on_delete=models.CASCADE, related_name='administradores')
+    fecha_asignacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('usuario', 'lugar')
+        verbose_name = "Administrador de Lugar"
+        verbose_name_plural = "Administradores de Lugares"
+
+    def __str__(self):
+        return f"{self.usuario.username} administra {self.lugar.nombre}"
+
 class Ruta(models.Model):
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField()
@@ -113,6 +131,30 @@ class Resena(models.Model):
     def __str__(self):
         target = self.lugar.nombre if self.lugar else (self.ruta.nombre if self.ruta else "Desconocido")
         return f"Reseña de {self.usuario.username} a {target} ({self.calificacion}*)"
+
+# --- NUEVO: Publicaciones (Reels/Feed) ---
+class Publicacion(models.Model):
+    TIPOS = [
+        ('EXPERIENCIA', 'Experiencia'),
+        ('PROMOCION', 'Promoción'),
+        ('EVENTO', 'Evento'),
+    ]
+
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='publicaciones')
+    lugar = models.ForeignKey(Lugar, on_delete=models.CASCADE, related_name='publicaciones')
+    tipo = models.CharField(max_length=20, choices=TIPOS, default='EXPERIENCIA')
+    
+    # Para MVP usamos FileField/ImageField, aquí dejo CharField si usas URL externa, 
+    # pero cambiaré a ImageField para que funcione con "upload_to" localmente.
+    # Necesitas instalar Pillow: pip install Pillow
+    archivo_media = models.ImageField(upload_to='publicaciones/', blank=True, null=True)
+    
+    descripcion = models.TextField(blank=True, null=True)
+    fecha = models.DateTimeField(auto_now_add=True)
+    es_visible = models.BooleanField(default=True) # Moderación
+
+    def __str__(self):
+        return f"{self.tipo}: {self.usuario.username} en {self.lugar.nombre}"
 
 class Favorito(models.Model):
     TIPOS = [
@@ -175,3 +217,12 @@ class Ruta_Lugar(models.Model):
 
     def __str__(self):
         return f"{self.ruta.nombre} - {self.orden}. {self.lugar.nombre}"
+
+class Comentario(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    publicacion = models.ForeignKey(Publicacion, on_delete=models.CASCADE, related_name='comentarios')
+    texto = models.TextField()
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Comentario de {self.usuario.username} en {self.publicacion.id}"

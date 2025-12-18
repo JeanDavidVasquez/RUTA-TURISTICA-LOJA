@@ -13,6 +13,9 @@ router.register(r'eventos', views.EventoViewSet, basename='evento')
 router.register(r'rutas', views.RutaViewSet, basename='ruta')
 router.register(r'rutas-guardadas', views.Ruta_GuardadaViewSet, basename='rutaguardada')
 router.register(r'ruta-lugares', views.Ruta_LugarViewSet, basename='rutalugar')
+router.register(r'publicaciones', views.PublicacionViewSet, basename='publicacion')
+router.register(r'administradores', views.AdministradorLugarViewSet, basename='administradorlugar')
+router.register(r'comentarios', views.ComentarioViewSet, basename='comentario')
 
 
 urlpatterns = [
