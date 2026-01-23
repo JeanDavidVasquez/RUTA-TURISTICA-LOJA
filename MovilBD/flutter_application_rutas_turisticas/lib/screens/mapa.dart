@@ -17,9 +17,9 @@ class Mapa extends StatefulWidget {
   final bool startNavigation; // New parameter
 
   const Mapa({
-    super.key, 
-    this.ruta, 
-    this.rutaLugares, 
+    super.key,
+    this.ruta,
+    this.rutaLugares,
     this.lugar,
     this.startNavigation = false,
   });
@@ -30,16 +30,16 @@ class Mapa extends StatefulWidget {
 
 class _MapaState extends State<Mapa> {
   final Completer<GoogleMapController> _controller = Completer();
-  
+
   // Coordenadas por defecto (Loja)
   static const CameraPosition _kLoja = CameraPosition(
     target: LatLng(-3.99313, -79.20422),
     zoom: 14.4746,
   );
 
-  Set<Marker> _markers = {};
-  Set<Polyline> _polylines = {};
-  Set<Circle> _circles = {}; // To highlight user location
+  final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
+  final Set<Circle> _circles = {}; // To highlight user location
   List<RutaLugar> _rutaLugares = [];
   bool _mostrarModalRuta = false;
   bool _navegacionActiva = false;
@@ -86,16 +86,19 @@ class _MapaState extends State<Mapa> {
     final ApiService apiService = ApiService();
     try {
       final lugares = await apiService.fetchLugares();
-      
+
       // 3. Filter Nearby (e.g., 5km radius)
       int count = 0;
       for (var lugar in lugares) {
         final dist = Geolocator.distanceBetween(
-          position.latitude, position.longitude,
-          lugar.latitud, lugar.longitud,
+          position.latitude,
+          position.longitude,
+          lugar.latitud,
+          lugar.longitud,
         );
 
-        if (dist <= 5000) { // 5km radius
+        if (dist <= 5000) {
+          // 5km radius
           count++;
           _markers.add(
             Marker(
@@ -105,7 +108,9 @@ class _MapaState extends State<Mapa> {
                 title: lugar.nombre,
                 snippet: "${(dist / 1000).toStringAsFixed(1)} km",
               ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueAzure,
+              ),
             ),
           );
         }
@@ -115,16 +120,25 @@ class _MapaState extends State<Mapa> {
         setState(() {});
         if (count > 0) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("📍 Se encontraron $count lugares cerca de ti.")),
+            SnackBar(
+              content: Text("📍 Se encontraron $count lugares cerca de ti."),
+            ),
           );
           // Move camera to user
           final GoogleMapController controller = await _controller.future;
-          controller.animateCamera(CameraUpdate.newLatLngZoom(
-            LatLng(position.latitude, position.longitude), 14,
-          ));
+          controller.animateCamera(
+            CameraUpdate.newLatLngZoom(
+              LatLng(position.latitude, position.longitude),
+              14,
+            ),
+          );
         } else {
-           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("📍 No hay lugares turísticos registrados cerca de tu ubicación.")),
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "📍 No hay lugares turísticos registrados cerca de tu ubicación.",
+              ),
+            ),
           );
         }
       }
@@ -159,41 +173,46 @@ class _MapaState extends State<Mapa> {
   }
 
   void _startUserTracking() {
-    _userTrackingSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
-      ),
-    ).listen((Position position) {
-      if (mounted) {
-        setState(() {
-          // 1. Update Halo Circle
-          _circles.clear();
-          _circles.add(
-            Circle(
-              circleId: const CircleId("user_halo"),
-              center: LatLng(position.latitude, position.longitude),
-              radius: 30, // 30 meters radius
-              fillColor: Colors.blue.withOpacity(0.3),
-              strokeColor: Colors.blue,
-              strokeWidth: 1,
-            ),
-          );
+    _userTrackingSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen((Position position) {
+          if (mounted) {
+            setState(() {
+              // 1. Update Halo Circle
+              _circles.clear();
+              _circles.add(
+                Circle(
+                  circleId: const CircleId("user_halo"),
+                  center: LatLng(position.latitude, position.longitude),
+                  radius: 30, // 30 meters radius
+                  fillColor: Colors.blue.withOpacity(0.3),
+                  strokeColor: Colors.blue,
+                  strokeWidth: 1,
+                ),
+              );
 
-          // 2. Update Custom User Marker (Large Dot)
-          _markers.removeWhere((m) => m.markerId.value == "user_custom_pos");
-          _markers.add(
-            Marker(
-              markerId: const MarkerId("user_custom_pos"),
-              position: LatLng(position.latitude, position.longitude),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-              zIndex: 100, // On top of everything
-              anchor: const Offset(0.5, 0.5), // Center the icon
-            ),
-          );
+              // 2. Update Custom User Marker (Large Dot)
+              _markers.removeWhere(
+                (m) => m.markerId.value == "user_custom_pos",
+              );
+              _markers.add(
+                Marker(
+                  markerId: const MarkerId("user_custom_pos"),
+                  position: LatLng(position.latitude, position.longitude),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueAzure,
+                  ),
+                  zIndex: 100, // On top of everything
+                  anchor: const Offset(0.5, 0.5), // Center the icon
+                ),
+              );
+            });
+          }
         });
-      }
-    });
   }
 
   void _addMarkerForLugar(Lugar lugar) {
@@ -211,7 +230,7 @@ class _MapaState extends State<Mapa> {
 
   Future<void> _loadRouteData() async {
     final ApiService apiService = ApiService();
-    
+
     // 1. Fetch RutaLugares if missing
     if (_rutaLugares.isEmpty && widget.ruta != null) {
       try {
@@ -228,16 +247,21 @@ class _MapaState extends State<Mapa> {
         final lugares = await apiService.fetchLugares();
         for (var i = 0; i < _rutaLugares.length; i++) {
           final rl = _rutaLugares[i];
-          final lugar = lugares.firstWhere((l) => l.id == rl.lugar, orElse: () => lugares.first);
+          final lugar = lugares.firstWhere(
+            (l) => l.id == rl.lugar,
+            orElse: () => lugares.first,
+          );
           final pos = LatLng(lugar.latitud, lugar.longitud);
           waypoints.add(pos);
-          
+
           _markers.add(
             Marker(
               markerId: MarkerId(rl.lugar.toString()),
               position: pos,
               infoWindow: InfoWindow(title: "${i + 1}. ${rl.lugarNombre}"),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueViolet,
+              ),
             ),
           );
         }
@@ -245,10 +269,12 @@ class _MapaState extends State<Mapa> {
         // 3. Draw Route
         if (waypoints.isNotEmpty) {
           _getRoutePolyline(waypoints);
-          
+
           // Move camera to first point
           final GoogleMapController controller = await _controller.future;
-          controller.animateCamera(CameraUpdate.newLatLngZoom(waypoints.first, 14));
+          controller.animateCamera(
+            CameraUpdate.newLatLngZoom(waypoints.first, 14),
+          );
         }
       } catch (e) {
         print("Error loading route data: $e");
@@ -261,8 +287,12 @@ class _MapaState extends State<Mapa> {
     if (waypoints.length < 2) return;
 
     // OSRM uses lon,lat
-    String coordinates = waypoints.map((p) => "${p.longitude},${p.latitude}").join(';');
-    final url = Uri.parse("http://router.project-osrm.org/route/v1/driving/$coordinates?overview=full&geometries=geojson");
+    String coordinates = waypoints
+        .map((p) => "${p.longitude},${p.latitude}")
+        .join(';');
+    final url = Uri.parse(
+      "http://router.project-osrm.org/route/v1/driving/$coordinates?overview=full&geometries=geojson",
+    );
 
     try {
       final response = await http.get(url);
@@ -270,7 +300,9 @@ class _MapaState extends State<Mapa> {
         final data = jsonDecode(response.body);
         if (data['routes'].isNotEmpty) {
           final geometry = data['routes'][0]['geometry']['coordinates'] as List;
-          List<LatLng> polylinePoints = geometry.map((p) => LatLng(p[1].toDouble(), p[0].toDouble())).toList();
+          List<LatLng> polylinePoints = geometry
+              .map((p) => LatLng(p[1].toDouble(), p[0].toDouble()))
+              .toList();
 
           setState(() {
             _polylines.add(
@@ -296,31 +328,36 @@ class _MapaState extends State<Mapa> {
     });
 
     final GoogleMapController controller = await _controller.future;
-    
+
     // 0. Immediate update with current position (if available)
     try {
       Position currentPos = await Geolocator.getCurrentPosition();
-      print("DEBUG: Current position found: ${currentPos.latitude}, ${currentPos.longitude}");
+      print(
+        "DEBUG: Current position found: ${currentPos.latitude}, ${currentPos.longitude}",
+      );
       _updateNavigation(currentPos, controller);
     } catch (e) {
       print("DEBUG: Could not get current position immediately: $e");
     }
 
     // Start following user location
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
-      ),
-    ).listen((Position position) {
-      print("DEBUG: Position stream update: ${position.latitude}, ${position.longitude}");
-      _updateNavigation(position, controller);
-    });
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 10,
+          ),
+        ).listen((Position position) {
+          print(
+            "DEBUG: Position stream update: ${position.latitude}, ${position.longitude}",
+          );
+          _updateNavigation(position, controller);
+        });
   }
 
   void _updateNavigation(Position position, GoogleMapController controller) {
     LatLng? targetPos;
-    
+
     // 1. Determine Target
     if (widget.lugar != null) {
       targetPos = LatLng(widget.lugar!.latitud, widget.lugar!.longitud);
@@ -329,7 +366,9 @@ class _MapaState extends State<Mapa> {
       final targetId = _rutaLugares.first.lugar.toString();
       final firstPlace = _markers.firstWhere(
         (m) => m.markerId.value == targetId,
-        orElse: () => _markers.isNotEmpty ? _markers.first : const Marker(markerId: MarkerId("dummy")),
+        orElse: () => _markers.isNotEmpty
+            ? _markers.first
+            : const Marker(markerId: MarkerId("dummy")),
       );
       if (firstPlace.markerId.value != "dummy") {
         targetPos = firstPlace.position;
@@ -338,29 +377,33 @@ class _MapaState extends State<Mapa> {
 
     // 2. Fetch Route if target exists
     if (targetPos != null) {
-       // Only fetch if we haven't fetched recently or if significant movement? 
-       // For now, we rely on _getRouteFromUserToStart handling updates efficiently or just overwriting.
-       // Actually, we should probably throttle this, but let's keep it simple for now.
-       
-       _getRouteFromUserToStart(
-          LatLng(position.latitude, position.longitude),
-          targetPos,
-        );
+      // Only fetch if we haven't fetched recently or if significant movement?
+      // For now, we rely on _getRouteFromUserToStart handling updates efficiently or just overwriting.
+      // Actually, we should probably throttle this, but let's keep it simple for now.
 
-        // Check distance warning
-        final dist = Geolocator.distanceBetween(
-          position.latitude, position.longitude,
-          targetPos.latitude, targetPos.longitude,
-        );
-        
-        if (dist > 50000) { 
-           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("⚠️ Estás muy lejos del destino (¿Usando emulador?)."),
-              duration: Duration(seconds: 2),
+      _getRouteFromUserToStart(
+        LatLng(position.latitude, position.longitude),
+        targetPos,
+      );
+
+      // Check distance warning
+      final dist = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        targetPos.latitude,
+        targetPos.longitude,
+      );
+
+      if (dist > 50000) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "⚠️ Estás muy lejos del destino (¿Usando emulador?).",
             ),
-          );
-        }
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
 
     controller.animateCamera(
@@ -377,7 +420,7 @@ class _MapaState extends State<Mapa> {
 
   Future<void> _getRouteFromUserToStart(LatLng userPos, LatLng startPos) async {
     print("DEBUG: Getting route from $userPos to $startPos");
-    
+
     // Fallback logic first (draw straight line immediately to ensure SOMETHING shows)
     if (mounted) {
       setState(() {
@@ -395,8 +438,11 @@ class _MapaState extends State<Mapa> {
     }
 
     // Then try to fetch real route
-    String coordinates = "${userPos.longitude},${userPos.latitude};${startPos.longitude},${startPos.latitude}";
-    final url = Uri.parse("http://router.project-osrm.org/route/v1/driving/$coordinates?overview=full&geometries=geojson");
+    String coordinates =
+        "${userPos.longitude},${userPos.latitude};${startPos.longitude},${startPos.latitude}";
+    final url = Uri.parse(
+      "http://router.project-osrm.org/route/v1/driving/$coordinates?overview=full&geometries=geojson",
+    );
 
     try {
       final response = await http.get(url).timeout(const Duration(seconds: 2));
@@ -404,7 +450,9 @@ class _MapaState extends State<Mapa> {
         final data = jsonDecode(response.body);
         if (data['routes'].isNotEmpty) {
           final geometry = data['routes'][0]['geometry']['coordinates'] as List;
-          List<LatLng> polylinePoints = geometry.map((p) => LatLng(p[1].toDouble(), p[0].toDouble())).toList();
+          List<LatLng> polylinePoints = geometry
+              .map((p) => LatLng(p[1].toDouble(), p[0].toDouble()))
+              .toList();
 
           print("DEBUG: OSRM route found with ${polylinePoints.length} points");
           if (mounted) {
@@ -446,7 +494,9 @@ class _MapaState extends State<Mapa> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: (!_navegacionActiva && (widget.ruta != null || widget.lugar != null))
+        leading:
+            (!_navegacionActiva &&
+                (widget.ruta != null || widget.lugar != null))
             ? Container(
                 margin: const EdgeInsets.all(8),
                 decoration: const BoxDecoration(
@@ -466,8 +516,14 @@ class _MapaState extends State<Mapa> {
         children: [
           GoogleMap(
             mapType: MapType.normal,
-            initialCameraPosition: widget.lugar != null 
-                ? CameraPosition(target: LatLng(widget.lugar!.latitud, widget.lugar!.longitud), zoom: 15)
+            initialCameraPosition: widget.lugar != null
+                ? CameraPosition(
+                    target: LatLng(
+                      widget.lugar!.latitud,
+                      widget.lugar!.longitud,
+                    ),
+                    zoom: 15,
+                  )
                 : _kLoja,
             onMapCreated: (GoogleMapController controller) {
               _controller.complete(controller);
@@ -484,12 +540,14 @@ class _MapaState extends State<Mapa> {
           // Modal de Ruta (Panel Inferior)
           if (_mostrarModalRuta && widget.ruta != null)
             Positioned(
-              bottom: _navegacionActiva ? 90 : 20, // Subir si hay botón de detener
+              bottom: _navegacionActiva
+                  ? 90
+                  : 20, // Subir si hay botón de detener
               left: 10,
               right: 10,
               child: _buildRutaPanel(widget.ruta!),
             ),
-            
+
           // Botón Detener Navegación
           if (_navegacionActiva)
             Positioned(
@@ -500,13 +558,17 @@ class _MapaState extends State<Mapa> {
                 onPressed: () {
                   _positionStreamSubscription?.cancel();
                   setState(() => _navegacionActiva = false);
-                  _controller.future.then((c) => c.animateCamera(CameraUpdate.zoomTo(15)));
+                  _controller.future.then(
+                    (c) => c.animateCamera(CameraUpdate.zoomTo(15)),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
                 ),
                 child: const Text("Detener Navegación"),
               ),
@@ -566,7 +628,7 @@ class _MapaState extends State<Mapa> {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Lista de Lugares (Panel Horizontal)
           if (_rutaLugares.isNotEmpty)
             SizedBox(
@@ -578,7 +640,10 @@ class _MapaState extends State<Mapa> {
                   final rl = _rutaLugares[index];
                   return Container(
                     margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(20),
@@ -591,13 +656,19 @@ class _MapaState extends State<Mapa> {
                           backgroundColor: const Color(0xFF8667F2),
                           child: Text(
                             "${index + 1}",
-                            style: const TextStyle(fontSize: 10, color: Colors.white),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           rl.lugarNombre,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -605,9 +676,9 @@ class _MapaState extends State<Mapa> {
                 },
               ),
             ),
-            
+
           const SizedBox(height: 16),
-          
+
           // Botón Navegar (Solo si no estamos navegando)
           if (!_navegacionActiva)
             SizedBox(

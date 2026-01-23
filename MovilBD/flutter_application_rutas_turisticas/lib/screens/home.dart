@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_rutas_turisticas/screens/details_places.dart'; 
 import 'package:flutter_application_rutas_turisticas/screens/detalle_ruta.dart';
+import 'package:flutter_application_rutas_turisticas/screens/ver_todo_lugares.dart';
+import 'package:flutter_application_rutas_turisticas/screens/ver_todo_rutas.dart';
+import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../models/lugar.dart';
 import '../models/ruta.dart';
@@ -33,12 +36,113 @@ class _HomeState extends State<Home> {
 
   // --- Estado para manejar los favoritos visualmente ---
   final Set<int> _favoritosIds = {}; 
+  
+  // --- NUEVO: Ubicación del usuario para filtrado ---
+  String? _userProvincia;
+  double? _userLat;
+  double? _userLng; 
 
   @override
   void initState() {
     super.initState();
+    _checkLocationPermission();
     _fetchData();
     _searchController.addListener(_onSearchChanged);
+  }
+  
+  /// Solicita permisos de ubicación al usuario al iniciar
+  Future<void> _checkLocationPermission() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Activa los servicios de ubicación para ver lugares cercanos'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sin ubicación se mostrarán todos los lugares disponibles'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Configura los permisos de ubicación en ajustes del dispositivo'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+    
+    // Permiso concedido - obtener ubicación actual
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+      );
+      setState(() {
+        _userLat = position.latitude;
+        _userLng = position.longitude;
+      });
+      
+      // Detectar provincia más cercana después de cargar datos
+      _detectNearestProvince();
+    } catch (e) {
+      print("Error obteniendo ubicación: $e");
+    }
+  }
+  
+  /// Detecta la provincia más cercana basándose en los lugares cargados
+  void _detectNearestProvince() {
+    if (_userLat == null || _userLng == null || _allLugares.isEmpty) return;
+    
+    String? nearestProvincia;
+    double minDistance = double.infinity;
+    
+    for (var lugar in _allLugares) {
+      final dist = Geolocator.distanceBetween(
+        _userLat!, _userLng!,
+        lugar.latitud, lugar.longitud,
+      );
+      
+      if (dist < minDistance && lugar.provincia != null) {
+        minDistance = dist;
+        nearestProvincia = lugar.provincia;
+      }
+    }
+    
+    if (nearestProvincia != null && mounted) {
+      setState(() {
+        _userProvincia = nearestProvincia;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('📍 Mostrando lugares en $nearestProvincia'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      
+      _applyFilters();
+    }
   }
 
   @override
@@ -137,6 +241,9 @@ class _HomeState extends State<Home> {
           _isLoading = false;
           _applyFilters();
         });
+        
+        // Detectar provincia cercana si tenemos ubicación
+        _detectNearestProvince();
       }
     } catch (e) {
       if (mounted) {
@@ -168,11 +275,15 @@ class _HomeState extends State<Home> {
 
       final matchesCategory = _selectedCategory == "Todos" ||
           lugar.categorias.any((cat) => cat.nombre == _selectedCategory);
+      
+      // Filtrar por provincia si se detectó ubicación del usuario
+      final matchesProvince = _userProvincia == null ||
+          lugar.provincia?.toLowerCase() == _userProvincia!.toLowerCase();
 
-      return matchesSearch && matchesCategory;
+      return matchesSearch && matchesCategory && matchesProvince;
     }).toList();
 
-    // Filter Routes
+    // Filter Routes - no filtramos por provincia las rutas porque pueden ser de varias provincias
     _filteredRutas = _allRutas.where((ruta) {
       final matchesSearch = ruta.nombre.toLowerCase().contains(query);
 
@@ -205,7 +316,14 @@ class _HomeState extends State<Home> {
                   const SliverToBoxAdapter(child: SizedBox(height: 16)),
                   if (_filteredRutas.isNotEmpty) ...[
                     SliverToBoxAdapter(
-                      child: _buildSectionTitle("Rutas Populares", () {}),
+                      child: _buildSectionTitle("Rutas Populares", () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const VerTodoRutasScreen(),
+                          ),
+                        );
+                      }),
                     ),
                     SliverToBoxAdapter(
                       child: Container(
@@ -227,13 +345,37 @@ class _HomeState extends State<Home> {
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        child: Text(
-                          "Explora Loja",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.grey[900],
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _userProvincia != null 
+                                  ? "Explora $_userProvincia" 
+                                  : "Todos los lugares",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.grey[900],
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const VerTodoLugaresScreen(),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                "Ver todo",
+                                style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -272,12 +414,39 @@ class _HomeState extends State<Home> {
         children: [
           Row(
             children: [
-              const Icon(Icons.location_on, color: Colors.redAccent, size: 20),
-              const SizedBox(width: 4),
-              const Text(
-                "Loja, Ecuador",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              Icon(
+                _userProvincia != null ? Icons.location_on : Icons.location_off_outlined,
+                color: _userProvincia != null ? Colors.redAccent : Colors.grey,
+                size: 20,
               ),
+              const SizedBox(width: 4),
+              if (_userProvincia != null)
+                Text(
+                  "$_userProvincia, Ecuador",
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                )
+              else
+                GestureDetector(
+                  onTap: () async {
+                    // Intentar obtener ubicación de nuevo
+                    await _checkLocationPermission();
+                    _detectNearestProvince();
+                  },
+                  child: Row(
+                    children: [
+                      Text(
+                        "Activar ubicación",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          color: primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.refresh, size: 16, color: primaryColor),
+                    ],
+                  ),
+                ),
               const Spacer(),
               CircleAvatar(
                 backgroundColor: Colors.grey[100],
@@ -519,7 +688,18 @@ class _HomeState extends State<Home> {
                     children: [
                       const Icon(Icons.star, color: Colors.amber, size: 12),
                       const SizedBox(width: 2),
-                      const Text("4.8", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      Text(
+                        lugar.ratingPromedio > 0 ? lugar.ratingPromedio.toStringAsFixed(1) : "Nuevo", 
+                        style: TextStyle(
+                          fontSize: 11, 
+                          fontWeight: FontWeight.bold,
+                          color: lugar.ratingPromedio > 0 ? Colors.black : Colors.grey[500],
+                        ),
+                      ),
+                      if (lugar.numResenas > 0) ...[
+                        const SizedBox(width: 2),
+                        Text("(${lugar.numResenas})", style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                      ],
                       const SizedBox(width: 4),
                       Text("• ${lugar.provincia ?? 'Loja'}", style: TextStyle(fontSize: 11, color: Colors.grey[600])),
                     ],

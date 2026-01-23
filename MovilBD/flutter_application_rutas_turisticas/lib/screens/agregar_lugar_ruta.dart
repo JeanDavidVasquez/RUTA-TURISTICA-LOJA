@@ -4,7 +4,10 @@ import '../models/categoria.dart';
 import '../services/api_service.dart';
 
 class AgregarLugarScreen extends StatefulWidget {
-  const AgregarLugarScreen({super.key});
+  /// Provincia requerida - si se especifica, solo muestra lugares de esa provincia
+  final String? requiredProvincia;
+  
+  const AgregarLugarScreen({super.key, this.requiredProvincia});
   @override
   State<AgregarLugarScreen> createState() => _AgregarLugarScreenState();
 }
@@ -34,6 +37,7 @@ class _AgregarLugarScreenState extends State<AgregarLugarScreen> {
         _lugaresFiltrados = lugares;
         _categorias = categorias;
         _isLoading = false;
+        _aplicarFiltros(); // Aplicar filtro de provincia inicial
       });
     } catch (e) {
       print("Error loading data: $e");
@@ -47,12 +51,15 @@ class _AgregarLugarScreenState extends State<AgregarLugarScreen> {
         final coincideTexto = lugar.nombre.toLowerCase().contains(
           _filtroTexto.toLowerCase(),
         );
-        // Filtro simple por nombre de categoría (asumiendo que lugar tiene lista de categorías)
-        // Si _filtroCategoria es "Todos", pasa. Si no, revisamos si alguna categoría del lugar coincide.
+        
         final coincideCategoria = _filtroCategoria == "Todos" ||
             lugar.categorias.any((c) => c.nombre == _filtroCategoria);
+        
+        // Filtrar por provincia si se especificó una
+        final coincideProvincia = widget.requiredProvincia == null ||
+            lugar.provincia?.toLowerCase() == widget.requiredProvincia!.toLowerCase();
             
-        return coincideTexto && coincideCategoria;
+        return coincideTexto && coincideCategoria && coincideProvincia;
       }).toList();
     });
   }

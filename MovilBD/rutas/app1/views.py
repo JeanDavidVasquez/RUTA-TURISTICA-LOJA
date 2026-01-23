@@ -74,9 +74,78 @@ class CategoriaViewSet(viewsets.ModelViewSet):
 class LugarViewSet(viewsets.ModelViewSet):
     """
     API endpoint que permite ver y editar Lugares.
+    Filtrar por: ?provincia=Loja&canton=Loja&parroquia=El Valle
     """
     queryset = Lugar.objects.all()
     serializer_class = LugarSerializer
+    
+    def get_queryset(self):
+        from django.db.models import Q
+        queryset = Lugar.objects.all()
+        provincia = self.request.query_params.get('provincia')
+        canton = self.request.query_params.get('canton')
+        parroquia = self.request.query_params.get('parroquia')
+        search = self.request.query_params.get('search')
+        
+        # Filtrar por ubicación FK o campos de texto (fallback)
+        if provincia:
+            queryset = queryset.filter(
+                Q(ubicacion__canton__provincia__nombre__iexact=provincia) |
+                Q(provincia__iexact=provincia)
+            )
+        if canton:
+            queryset = queryset.filter(
+                Q(ubicacion__canton__nombre__iexact=canton) |
+                Q(canton__iexact=canton)
+            )
+        if parroquia:
+            queryset = queryset.filter(
+                Q(ubicacion__nombre__iexact=parroquia) |
+                Q(parroquia__iexact=parroquia)
+            )
+        if search:
+            queryset = queryset.filter(nombre__icontains=search)
+        
+        return queryset
+
+class ProvinciaViewSet(viewsets.ViewSet):
+    """
+    API endpoint para listar Provincias (de la tabla Provincia).
+    """
+    def list(self, request):
+        provincias = Provincia.objects.all().order_by('nombre')
+        result = [{'id': p.id, 'nombre': p.nombre} for p in provincias]
+        return Response(result)
+
+class CantonViewSet(viewsets.ViewSet):
+    """
+    API endpoint para listar Cantones.
+    Filtrar por: ?provincia=NombreProvincia
+    """
+    def list(self, request):
+        provincia_nombre = request.query_params.get('provincia')
+        queryset = Canton.objects.all().order_by('nombre')
+        
+        if provincia_nombre:
+            queryset = queryset.filter(provincia__nombre__iexact=provincia_nombre)
+        
+        result = [{'id': c.id, 'nombre': c.nombre, 'provincia_nombre': c.provincia.nombre} for c in queryset]
+        return Response(result)
+
+class ParroquiaViewSet(viewsets.ViewSet):
+    """
+    API endpoint para listar Parroquias.
+    Filtrar por: ?canton=NombreCanton
+    """
+    def list(self, request):
+        canton_nombre = request.query_params.get('canton')
+        queryset = Parroquia.objects.all().order_by('nombre')
+        
+        if canton_nombre:
+            queryset = queryset.filter(canton__nombre__iexact=canton_nombre)
+        
+        result = [{'id': p.id, 'nombre': p.nombre, 'canton_nombre': p.canton.nombre} for p in queryset]
+        return Response(result)
 
 class ResenaViewSet(viewsets.ModelViewSet):
     """
@@ -188,7 +257,6 @@ def load_parroquias(request):
     parroquias = Parroquia.objects.filter(canton_id=canton_id).order_by('nombre')
     return JsonResponse(list(parroquias.values('id', 'nombre')), safe=False)
 
-# --- NUEVAS VISTAS (Social) ---
 
 class PublicacionViewSet(viewsets.ModelViewSet):
     """

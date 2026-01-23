@@ -3,7 +3,6 @@ import 'package:flutter_application_rutas_turisticas/screens/login.dart';
 import 'package:flutter_application_rutas_turisticas/screens/main_layout.dart';
 import 'package:flutter_application_rutas_turisticas/screens/register.dart';
 import 'package:flutter_application_rutas_turisticas/screens/splash.dart';
-import 'package:flutter_application_rutas_turisticas/screens/test_connection_screen.dart';
 import 'package:flutter_application_rutas_turisticas/screens/mis_resenas.dart';
 
 void main() {

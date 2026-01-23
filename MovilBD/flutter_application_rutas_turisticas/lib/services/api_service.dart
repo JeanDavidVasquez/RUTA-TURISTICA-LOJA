@@ -9,6 +9,7 @@ import '../models/usuario.dart';
 import '../models/categoria.dart';
 import '../models/publicacion.dart';
 import '../models/comentario.dart';
+import '../models/ubicacion.dart';
 
 class ApiService {
   // Configuracion de URL Base
@@ -24,7 +25,7 @@ class ApiService {
     // return 'http://10.0.2.2:8000/api';
 
     // DISPOSITIVO FÍSICO:
-    return 'http://192.168.1.113:8000/api';
+    return 'http://172.18.93.159:8000/api';
   }
 
   // Almacenamiento simple del ID de usuario en memoria (se pierde al reiniciar app)
@@ -56,6 +57,71 @@ class ApiService {
       return lugares;
     } else {
       throw Exception('Failed to load lugares: ${response.statusCode}');
+    }
+  }
+
+  /// Obtiene lugares con filtros opcionales
+  Future<List<Lugar>> fetchLugaresFiltrados({
+    String? search,
+    String? provincia,
+    String? canton,
+    String? parroquia,
+  }) async {
+    String query = '';
+    if (search != null && search.isNotEmpty) query += 'search=$search&';
+    if (provincia != null && provincia.isNotEmpty) {
+      query += 'provincia=$provincia&';
+    }
+    if (canton != null && canton.isNotEmpty) query += 'canton=$canton&';
+    if (parroquia != null && parroquia.isNotEmpty) {
+      query += 'parroquia=$parroquia&';
+    }
+
+    final response = await http.get(Uri.parse('$baseUrl/lugares/?$query'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> body = jsonDecode(response.body);
+      return body.map((item) => Lugar.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load lugares: ${response.statusCode}');
+    }
+  }
+
+  /// Obtiene todas las provincias disponibles
+  Future<List<Provincia>> fetchProvincias() async {
+    final response = await http.get(Uri.parse('$baseUrl/provincias/'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> body = jsonDecode(response.body);
+      return body.map((item) => Provincia.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load provincias: ${response.statusCode}');
+    }
+  }
+
+  /// Obtiene cantones (filtrados por nombre de provincia si se especifica)
+  Future<List<Canton>> fetchCantones({String? provinciaNombre}) async {
+    String query = provinciaNombre != null ? '?provincia=$provinciaNombre' : '';
+    final response = await http.get(Uri.parse('$baseUrl/cantones/$query'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> body = jsonDecode(response.body);
+      return body.map((item) => Canton.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load cantones: ${response.statusCode}');
+    }
+  }
+
+  /// Obtiene parroquias (filtradas por nombre de cantón si se especifica)
+  Future<List<Parroquia>> fetchParroquias({String? cantonNombre}) async {
+    String query = cantonNombre != null ? '?canton=$cantonNombre' : '';
+    final response = await http.get(Uri.parse('$baseUrl/parroquias/$query'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> body = jsonDecode(response.body);
+      return body.map((item) => Parroquia.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load parroquias: ${response.statusCode}');
     }
   }
 
@@ -222,8 +288,9 @@ class ApiService {
 
   // Obtiene el estado de las 3 listas para un lugar
   Future<Map<String, bool>> checkFavoritoStatus(int lugarId) async {
-    if (currentUserId == null)
+    if (currentUserId == null) {
       return {'FAV': false, 'PEND': false, 'VISIT': false};
+    }
 
     final response = await http.get(
       Uri.parse('$baseUrl/favoritos/?usuario=$currentUserId&lugar=$lugarId'),
@@ -535,8 +602,10 @@ class ApiService {
   // --- SOCIAL FEED & GESTIÓN ---
 
   Future<List<Lugar>> getManagedPlaces(int userId) async {
-    final response = await http.get(Uri.parse('$baseUrl/usuarios/$userId/managed_places/'));
-    
+    final response = await http.get(
+      Uri.parse('$baseUrl/usuarios/$userId/managed_places/'),
+    );
+
     if (response.statusCode == 200) {
       List<dynamic> body = jsonDecode(response.body);
       return body.map((item) => Lugar.fromJson(item)).toList();
@@ -545,13 +614,19 @@ class ApiService {
     }
   }
 
-  Future<List<Publicacion>> fetchPublicaciones({int? lugarId, int? usuarioId, String? tipo}) async {
+  Future<List<Publicacion>> fetchPublicaciones({
+    int? lugarId,
+    int? usuarioId,
+    String? tipo,
+  }) async {
     String query = '';
     if (lugarId != null) query += 'lugar=$lugarId&';
     if (usuarioId != null) query += 'usuario=$usuarioId&';
     if (tipo != null) query += 'tipo=$tipo&';
 
-    final response = await http.get(Uri.parse('$baseUrl/publicaciones/?$query'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/publicaciones/?$query'),
+    );
 
     if (response.statusCode == 200) {
       List<dynamic> body = jsonDecode(response.body);
@@ -579,7 +654,7 @@ class ApiService {
     if (imageFile != null) {
       var stream = http.ByteStream(imageFile.openRead());
       var length = await imageFile.length();
-      
+
       var multipartFile = http.MultipartFile(
         'archivo_media',
         stream,
@@ -611,7 +686,9 @@ class ApiService {
   }
 
   Future<void> deletePublicacion(int id) async {
-    final response = await http.delete(Uri.parse('$baseUrl/publicaciones/$id/'));
+    final response = await http.delete(
+      Uri.parse('$baseUrl/publicaciones/$id/'),
+    );
 
     if (response.statusCode != 204) {
       throw Exception('Failed to delete publicacion: ${response.body}');
@@ -619,7 +696,9 @@ class ApiService {
   }
 
   Future<List<Comentario>> fetchComentarios(int publicacionId) async {
-    final response = await http.get(Uri.parse('$baseUrl/comentarios/?publicacion=$publicacionId'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/comentarios/?publicacion=$publicacionId'),
+    );
     if (response.statusCode == 200) {
       List<dynamic> body = jsonDecode(response.body);
       return body.map((item) => Comentario.fromJson(item)).toList();
@@ -628,7 +707,11 @@ class ApiService {
     }
   }
 
-  Future<void> createComentario(int usuarioId, int publicacionId, String texto) async {
+  Future<void> createComentario(
+    int usuarioId,
+    int publicacionId,
+    String texto,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/comentarios/'),
       headers: {'Content-Type': 'application/json'},
@@ -647,14 +730,16 @@ class ApiService {
   String? getImageUrl(String? path) {
     if (path == null) return null;
     if (path.startsWith('http')) return path;
-    
+
     String cleanBase = baseUrl.replaceAll('/api', '');
-    if (cleanBase.endsWith('/')) cleanBase = cleanBase.substring(0, cleanBase.length - 1);
-    
+    if (cleanBase.endsWith('/')) {
+      cleanBase = cleanBase.substring(0, cleanBase.length - 1);
+    }
+
     if (path.startsWith('/')) path = path.substring(1);
-    
+
     if (path.startsWith('media/')) {
-       return "$cleanBase/$path";
+      return "$cleanBase/$path";
     }
 
     return "$cleanBase/media/$path";

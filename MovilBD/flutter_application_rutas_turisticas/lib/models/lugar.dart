@@ -14,6 +14,8 @@ class Lugar {
   final String? contacto;
   final String? urlImagenPrincipal;
   final List<Categoria> categorias;
+  final double ratingPromedio;
+  final int numResenas;
 
   Lugar({
     required this.id,
@@ -29,9 +31,20 @@ class Lugar {
     this.contacto,
     this.urlImagenPrincipal,
     this.categorias = const [],
+    this.ratingPromedio = 0.0,
+    this.numResenas = 0,
   });
 
   factory Lugar.fromJson(Map<String, dynamic> json) {
+    // Parseo seguro de rating_promedio - puede venir como null, int o double
+    double parseRating(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is int) return value.toDouble();
+      if (value is double) return value;
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+    
     return Lugar(
       id: json['id'],
       nombre: json['nombre'],
@@ -49,6 +62,8 @@ class Lugar {
               ?.map((item) => Categoria.fromJson(item))
               .toList() ??
           [],
+      ratingPromedio: parseRating(json['rating_promedio']),
+      numResenas: json['num_resenas'] ?? 0,
     );
   }
 }

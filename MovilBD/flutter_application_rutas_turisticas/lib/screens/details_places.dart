@@ -8,10 +8,10 @@ import 'post_detail.dart';
 class DetalleLugarScreen extends StatefulWidget {
   final Lugar lugar;
   // NUEVO: Recibimos el estado inicial desde el Home
-  final bool? initialFavState; 
-  
+  final bool? initialFavState;
+
   const DetalleLugarScreen({
-    super.key, 
+    super.key,
     required this.lugar,
     this.initialFavState,
   });
@@ -23,7 +23,7 @@ class DetalleLugarScreen extends StatefulWidget {
 class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   final ApiService _apiService = ApiService();
   late Lugar _lugar;
-   
+
   // Estados locales
   bool _isFavorito = false;
   bool _isPendiente = false;
@@ -33,7 +33,7 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   // Reseñas
   List<dynamic> _reviews = [];
   bool _loadingReviews = true;
-  
+
   // Vivencias (Novedades)
   List<Publicacion> _novedades = [];
   bool _loadingNovedades = true;
@@ -42,17 +42,17 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
   void initState() {
     super.initState();
     _lugar = widget.lugar;
-    
+
     if (widget.initialFavState != null) {
       _isFavorito = widget.initialFavState!;
     }
-    
+
     _checkStatus();
     _loadFullDetails();
     _loadReviews();
     _loadNovedades();
   }
-  
+
   Future<void> _loadNovedades() async {
     try {
       final posts = await _apiService.fetchPublicaciones(lugarId: _lugar.id);
@@ -168,15 +168,22 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                   onPressed: () async {
                     Navigator.pop(context);
                     try {
-                      await _apiService.postReview(_lugar.id, 'lugar', rating, commentController.text);
-                      _loadReviews(); 
+                      await _apiService.postReview(
+                        _lugar.id,
+                        'lugar',
+                        rating,
+                        commentController.text,
+                      );
+                      _loadReviews();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("¡Gracias por tu reseña!")),
+                        const SnackBar(
+                          content: Text("¡Gracias por tu reseña!"),
+                        ),
                       );
                     } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Error: $e")),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text("Error: $e")));
                     }
                   },
                   child: const Text("Publicar"),
@@ -206,9 +213,9 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
           if (tipo == 'PEND') _isPendiente = !isActive;
           if (tipo == 'VISIT') _isVisitado = !isActive;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error al guardar: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error al guardar: $e")));
       }
     }
   }
@@ -257,7 +264,7 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                     title: const Text("Favoritos"),
                     trailing: Switch(
                       value: _isFavorito,
-                      activeColor: Colors.red,
+                      activeThumbColor: Colors.red,
                       onChanged: (val) {
                         _toggleStatus('FAV', val);
                         setModalState(() {});
@@ -274,7 +281,7 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                     title: const Text("Quiero ir (Pendientes)"),
                     trailing: Switch(
                       value: _isPendiente,
-                      activeColor: Colors.blue,
+                      activeThumbColor: Colors.blue,
                       onChanged: (val) {
                         _toggleStatus('PEND', val);
                         setModalState(() {});
@@ -291,7 +298,7 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                     title: const Text("Ya visitado"),
                     trailing: Switch(
                       value: _isVisitado,
-                      activeColor: Colors.green,
+                      activeThumbColor: Colors.green,
                       onChanged: (val) {
                         _toggleStatus('VISIT', val);
                         setModalState(() {});
@@ -313,10 +320,10 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
     final lugar = _lugar;
 
     return PopScope(
-      canPop: false, 
+      canPop: false,
       onPopInvoked: (didPop) {
         if (didPop) return;
-        _onPop(); 
+        _onPop();
       },
       child: Scaffold(
         body: SingleChildScrollView(
@@ -331,10 +338,14 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                     width: double.infinity,
                     color: Colors.grey[300],
                     child: Image.network(
-                      lugar.urlImagenPrincipal ?? "https://via.placeholder.com/400x300",
+                      lugar.urlImagenPrincipal ??
+                          "https://via.placeholder.com/400x300",
                       fit: BoxFit.cover,
-                      errorBuilder: (c, e, s) =>
-                          const Icon(Icons.image, size: 100, color: Colors.grey),
+                      errorBuilder: (c, e, s) => const Icon(
+                        Icons.image,
+                        size: 100,
+                        color: Colors.grey,
+                      ),
                     ),
                   ),
                   Positioned(
@@ -342,21 +353,23 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                     left: 16,
                     child: _buildCircleBtn(
                       icon: Icons.arrow_back,
-                      onTap: _onPop, 
+                      onTap: _onPop,
                     ),
                   ),
                   Positioned(
                     top: 40,
                     right: 16,
                     child: _buildCircleBtn(
-                      icon: _isFavorito ? Icons.favorite : Icons.favorite_border,
+                      icon: _isFavorito
+                          ? Icons.favorite
+                          : Icons.favorite_border,
                       colorIcon: _isFavorito ? Colors.red : Colors.black,
                       onTap: () => _toggleStatus('FAV', !_isFavorito),
                     ),
                   ),
                 ],
               ),
-      
+
               // --- 2. CONTENIDO ---
               Padding(
                 padding: const EdgeInsets.all(20.0),
@@ -382,109 +395,201 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                         labelStyle: const TextStyle(color: Colors.black54),
                       ),
                     const SizedBox(height: 16),
-      
+
                     Text(
                       lugar.nombre,
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
-      
+
                     Row(
                       children: [
                         const Icon(Icons.star, color: Colors.amber, size: 20),
                         const SizedBox(width: 4),
                         Text(
-                          "(${_reviews.length} reseñas)", 
-                          style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                          "(${_reviews.length} reseñas)",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                          ),
                         ),
                         const Spacer(),
                         if (_isVisitado)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(4)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green[50],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                             child: const Row(
                               children: [
-                                Icon(Icons.check, size: 14, color: Colors.green),
+                                Icon(
+                                  Icons.check,
+                                  size: 14,
+                                  color: Colors.green,
+                                ),
                                 SizedBox(width: 4),
-                                Text("Visitado", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+                                Text(
+                                  "Visitado",
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                       ],
                     ),
                     const SizedBox(height: 24),
-      
+
                     const Text(
                       "Descripción",
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       lugar.descripcion,
-                      style: TextStyle(fontSize: 16, color: Colors.grey[700], height: 1.5),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[700],
+                        height: 1.5,
+                      ),
                     ),
                     const SizedBox(height: 32),
-      
+
                     if (lugar.direccionCompleta != null) ...[
-                      _buildInfoRow(Icons.location_on_outlined, "Dirección", lugar.direccionCompleta!),
+                      _buildInfoRow(
+                        Icons.location_on_outlined,
+                        "Dirección",
+                        lugar.direccionCompleta!,
+                      ),
                       const SizedBox(height: 20),
                     ],
-                    
+
                     if (lugar.horarios != null) ...[
-                      _buildInfoRow(Icons.access_time, "Horarios", lugar.horarios!),
+                      _buildInfoRow(
+                        Icons.access_time,
+                        "Horarios",
+                        lugar.horarios!,
+                      ),
                       const SizedBox(height: 20),
                     ],
-      
+
                     if (lugar.contacto != null) ...[
-                      _buildInfoRow(Icons.phone_outlined, "Contacto", lugar.contacto!),
+                      _buildInfoRow(
+                        Icons.phone_outlined,
+                        "Contacto",
+                        lugar.contacto!,
+                      ),
                       const SizedBox(height: 32),
                     ],
-      
+
                     // --- 3. BOTONES DE ACCIÓN ---
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _mostrarOpcionesGuardado(context),
-                            icon: Icon(_isPendiente ? Icons.bookmark : Icons.bookmark_border, color: _isPendiente ? primaryPurple : Colors.black, size: 20),
-                            label: Text("Guardar", style: TextStyle(color: _isPendiente ? primaryPurple : Colors.black)),
+                            icon: Icon(
+                              _isPendiente
+                                  ? Icons.bookmark
+                                  : Icons.bookmark_border,
+                              color: _isPendiente
+                                  ? primaryPurple
+                                  : Colors.black,
+                              size: 20,
+                            ),
+                            label: Text(
+                              "Guardar",
+                              style: TextStyle(
+                                color: _isPendiente
+                                    ? primaryPurple
+                                    : Colors.black,
+                              ),
+                            ),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: BorderSide(color: _isPendiente ? primaryPurple : Colors.grey[300]!),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              side: BorderSide(
+                                color: _isPendiente
+                                    ? primaryPurple
+                                    : Colors.grey[300]!,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 10),
-      
+
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => Mapa(lugar: lugar)));
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => Mapa(lugar: lugar),
+                                ),
+                              );
                             },
-                            icon: const Icon(Icons.map_outlined, size: 20, color: Colors.black),
-                            label: const Text("Ver Mapa", style: TextStyle(color: Colors.black)),
+                            icon: const Icon(
+                              Icons.map_outlined,
+                              size: 20,
+                              color: Colors.black,
+                            ),
+                            label: const Text(
+                              "Ver Mapa",
+                              style: TextStyle(color: Colors.black),
+                            ),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               side: BorderSide(color: Colors.grey[300]!),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 10),
-      
+
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => Mapa(lugar: lugar, startNavigation: true)));
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      Mapa(lugar: lugar, startNavigation: true),
+                                ),
+                              );
                             },
-                            icon: const Icon(Icons.navigation, color: Colors.white, size: 20),
-                            label: const Text("Ir", style: TextStyle(color: Colors.white)),
+                            icon: const Icon(
+                              Icons.navigation,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            label: const Text(
+                              "Ir",
+                              style: TextStyle(color: Colors.white),
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryPurple,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           ),
                         ),
@@ -496,7 +601,13 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
 
                     // --- NUEVA SECCIÓN: VIVENCIAS (FEED) ---
                     if (!_loadingNovedades && _novedades.isNotEmpty) ...[
-                      const Text("Vivencias", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const Text(
+                        "Vivencias",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 10),
                       SizedBox(
                         height: 220,
@@ -510,7 +621,8 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => PostDetailScreen(post: post),
+                                    builder: (context) =>
+                                        PostDetailScreen(post: post),
                                   ),
                                 );
                               },
@@ -519,31 +631,64 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                                 margin: const EdgeInsets.only(right: 16),
                                 child: Card(
                                   clipBehavior: Clip.antiAlias,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                   child: Stack(
                                     children: [
                                       if (post.archivoMedia != null)
                                         Positioned.fill(
                                           child: Image.network(
-                                            _apiService.getImageUrl(post.archivoMedia)!, 
+                                            _apiService.getImageUrl(
+                                              post.archivoMedia,
+                                            )!,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (c,e,s) => Container(color: Colors.grey[300]),
+                                            errorBuilder: (c, e, s) =>
+                                                Container(
+                                                  color: Colors.grey[300],
+                                                ),
                                           ),
                                         ),
                                       Container(
-                                         decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withOpacity(0.8)])),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Colors.transparent,
+                                              Colors.black.withOpacity(0.8),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                       Positioned(
-                                        bottom: 12, left: 12, right: 12,
+                                        bottom: 12,
+                                        left: 12,
+                                        right: 12,
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                             Text(post.usuarioUsername, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                             Text(post.descripcion ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                            Text(
+                                              post.usuarioUsername,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              post.descripcion ?? '',
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                              ),
+                                            ),
                                           ],
                                         ),
-                                      )
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -556,22 +701,40 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                       const Divider(),
                       const SizedBox(height: 10),
                     ],
-      
+
                     // --- SECCIÓN DE RESEÑAS ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("Reseñas", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        TextButton.icon(onPressed: _postReview, icon: const Icon(Icons.rate_review, size: 18), label: const Text("Opinar")),
+                        const Text(
+                          "Reseñas",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _postReview,
+                          icon: const Icon(Icons.rate_review, size: 18),
+                          label: const Text("Opinar"),
+                        ),
                       ],
                     ),
-                    
+
                     if (_loadingReviews)
-                      const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
                     else if (_reviews.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Text("Sé el primero en opinar sobre este lugar.", style: TextStyle(color: Colors.grey)),
+                        child: Text(
+                          "Sé el primero en opinar sobre este lugar.",
+                          style: TextStyle(color: Colors.grey),
+                        ),
                       )
                     else
                       ListView.builder(
@@ -582,20 +745,33 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
                         itemBuilder: (context, index) {
                           final review = _reviews[index];
                           return ListTile(
-                            leading: const CircleAvatar(child: Icon(Icons.person, size: 16)),
-                            title: Text(review['usuario_username'] ?? 'Usuario'),
+                            leading: const CircleAvatar(
+                              child: Icon(Icons.person, size: 16),
+                            ),
+                            title: Text(
+                              review['usuario_username'] ?? 'Usuario',
+                            ),
                             subtitle: Text(review['texto'] ?? ''),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text("${review['calificacion']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                const Icon(Icons.star, color: Colors.amber, size: 16),
+                                Text(
+                                  "${review['calificacion']}",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: 16,
+                                ),
                               ],
                             ),
                           );
                         },
                       ),
-      
+
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -607,12 +783,20 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
     );
   }
 
-  Widget _buildCircleBtn({required IconData icon, required VoidCallback onTap, Color colorIcon = Colors.black}) {
+  Widget _buildCircleBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color colorIcon = Colors.black,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)]),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.9),
+          shape: BoxShape.circle,
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        ),
         child: Icon(icon, color: colorIcon, size: 24),
       ),
     );
@@ -628,14 +812,22 @@ class _DetalleLugarScreenState extends State<DetalleLugarScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(value, style: TextStyle(fontSize: 16, color: Colors.grey[700])),
+              Text(
+                value,
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              ),
             ],
           ),
         ),
       ],
     );
   }
-
 }

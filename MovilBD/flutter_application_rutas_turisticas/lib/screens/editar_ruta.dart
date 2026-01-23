@@ -21,7 +21,7 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
 
   late TextEditingController _nombreController;
   late TextEditingController _descripcionController;
-  
+
   // Categorías
   List<Categoria> _categoriasDisponibles = [];
   Categoria? _selectedCategory;
@@ -49,39 +49,44 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
     try {
       // 1. Cargar categorías
       final categorias = await apiService.fetchCategorias();
-      
+
       // 2. Cargar todos los lugares (necesario para mapear IDs a objetos)
       final todosLosLugares = await apiService.fetchLugares();
 
       // 3. Si es edición, cargar lugares de la ruta
       if (widget.ruta != null) {
         final rutaLugares = await apiService.fetchRutaLugares(widget.ruta!.id);
-        
+
         // Mapear IDs de RutaLugar a objetos Lugar completos con metadatos
-        _puntosRuta = rutaLugares.map((rl) {
-          try {
-            final lugar = todosLosLugares.firstWhere((l) => l.id == rl.lugar);
-            return {
-              'lugar': lugar,
-              'tiempo': rl.tiempoSugeridoMinutos,
-              'comentario': rl.comentario ?? '',
-            };
-          } catch (e) {
-            return null; 
-          }
-        }).whereType<Map<String, dynamic>>().toList();
+        _puntosRuta = rutaLugares
+            .map((rl) {
+              try {
+                final lugar = todosLosLugares.firstWhere(
+                  (l) => l.id == rl.lugar,
+                );
+                return {
+                  'lugar': lugar,
+                  'tiempo': rl.tiempoSugeridoMinutos,
+                  'comentario': rl.comentario ?? '',
+                };
+              } catch (e) {
+                return null;
+              }
+            })
+            .whereType<Map<String, dynamic>>()
+            .toList();
       }
 
       setState(() {
         _categoriasDisponibles = categorias;
         _isLoadingCategorias = false;
-        
+
         // Seleccionar categoría inicial si estamos editando
         if (widget.ruta != null && widget.ruta!.categorias.isNotEmpty) {
           // Buscamos la categoría que coincida por ID
           try {
             _selectedCategory = categorias.firstWhere(
-              (c) => c.id == widget.ruta!.categorias.first.id
+              (c) => c.id == widget.ruta!.categorias.first.id,
             );
           } catch (e) {
             // Si no se encuentra, dejamos null o la primera
@@ -131,11 +136,13 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
       if (widget.ruta != null) {
         // Actualizar
         rutaGuardada = await apiService.updateRuta(widget.ruta!.id, rutaData);
-        
+
         // Actualizar lugares:
         // Estrategia simple: Borrar todos los lugares existentes y añadir los nuevos.
         // 1. Obtener lugares actuales
-        final currentRutaLugares = await apiService.fetchRutaLugares(rutaGuardada.id);
+        final currentRutaLugares = await apiService.fetchRutaLugares(
+          rutaGuardada.id,
+        );
         // 2. Borrarlos
         for (var rl in currentRutaLugares) {
           await apiService.removeLugarFromRuta(rl.id);
@@ -153,9 +160,9 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
         final comentario = item['comentario'] as String;
 
         await apiService.addLugarToRuta(
-          rutaGuardada.id, 
-          lugar.id, 
-          i, 
+          rutaGuardada.id,
+          lugar.id,
+          i,
           tiempoSugerido: tiempo,
           comentario: comentario.isNotEmpty ? comentario : null,
         );
@@ -167,9 +174,9 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
     } catch (e) {
       print("Error saving ruta: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -206,9 +213,9 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
       } catch (e) {
         print("Error deleting ruta: $e");
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al eliminar: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
           setState(() => _isSaving = false);
         }
       }
@@ -218,7 +225,7 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = Theme.of(context).primaryColor;
-    
+
     if (_isLoadingCategorias) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -275,14 +282,18 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              const Text("Nombre", style: TextStyle(fontWeight: FontWeight.w600)),
+              const Text(
+                "Nombre",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               TextFormField(
                 controller: _nombreController,
                 decoration: const InputDecoration(
                   hintText: "Ej: Ruta por el centro",
                 ),
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'El nombre es requerido' : null,
+                validator: (value) => value == null || value.isEmpty
+                    ? 'El nombre es requerido'
+                    : null,
               ),
               const SizedBox(height: 16),
               const Text(
@@ -295,8 +306,9 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
                   hintText: "Describe tu ruta...",
                 ),
                 maxLines: 4,
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'La descripción es requerida' : null,
+                validator: (value) => value == null || value.isEmpty
+                    ? 'La descripción es requerida'
+                    : null,
               ),
               const SizedBox(height: 16),
               const Text(
@@ -304,7 +316,7 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               DropdownButtonFormField<Categoria>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 items: _categoriasDisponibles
                     .map(
                       (Categoria category) => DropdownMenuItem(
@@ -404,23 +416,51 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
               // BOTÓN AÑADIR LUGAR
               ElevatedButton.icon(
                 onPressed: () async {
+                  // Si ya hay lugares en la ruta, restringir a la misma provincia
+                  String? requiredProvincia;
+                  if (_puntosRuta.isNotEmpty) {
+                    final primerLugar = _puntosRuta.first['lugar'] as Lugar;
+                    requiredProvincia = primerLugar.provincia;
+                  }
+
                   final resultado = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AgregarLugarScreen(),
+                      builder: (context) => AgregarLugarScreen(
+                        requiredProvincia: requiredProvincia,
+                      ),
                     ),
                   );
                   if (resultado != null && resultado is Lugar) {
-                    setState(() => _puntosRuta.add({
-                      'lugar': resultado,
-                      'tiempo': 60, // Default 60 min
-                      'comentario': '',
-                    }));
+                    // Verificar que sea de la misma provincia si ya hay lugares
+                    if (requiredProvincia != null &&
+                        resultado.provincia?.toLowerCase() !=
+                            requiredProvincia.toLowerCase()) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Solo puedes agregar lugares de $requiredProvincia',
+                          ),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      return;
+                    }
+
+                    setState(
+                      () => _puntosRuta.add({
+                        'lugar': resultado,
+                        'tiempo': 60, // Default 60 min
+                        'comentario': '',
+                      }),
+                    );
                   }
                 },
                 icon: Icon(Icons.add, color: primaryColor),
                 label: Text(
-                  "Añadir Lugar",
+                  _puntosRuta.isEmpty
+                      ? "Añadir Lugar"
+                      : "Añadir Lugar (${(_puntosRuta.first['lugar'] as Lugar).provincia ?? 'misma provincia'})",
                   style: TextStyle(
                     color: primaryColor,
                     fontWeight: FontWeight.bold,
@@ -484,9 +524,13 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
     final lugar = item['lugar'] as Lugar;
     int tiempo = item['tiempo'] as int;
     String comentario = item['comentario'] as String;
-    
-    final TextEditingController timeController = TextEditingController(text: tiempo.toString());
-    final TextEditingController commentController = TextEditingController(text: comentario);
+
+    final TextEditingController timeController = TextEditingController(
+      text: tiempo.toString(),
+    );
+    final TextEditingController commentController = TextEditingController(
+      text: comentario,
+    );
 
     await showDialog(
       context: context,
@@ -524,7 +568,8 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
           ElevatedButton(
             onPressed: () {
               setState(() {
-                _puntosRuta[index]['tiempo'] = int.tryParse(timeController.text) ?? 0;
+                _puntosRuta[index]['tiempo'] =
+                    int.tryParse(timeController.text) ?? 0;
                 _puntosRuta[index]['comentario'] = commentController.text;
               });
               Navigator.pop(context);
@@ -536,7 +581,12 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
     );
   }
 
-  Widget _buildPuntoItem(int index, Map<String, dynamic> item, VoidCallback onDelete, VoidCallback onEdit) {
+  Widget _buildPuntoItem(
+    int index,
+    Map<String, dynamic> item,
+    VoidCallback onDelete,
+    VoidCallback onEdit,
+  ) {
     final lugar = item['lugar'] as Lugar;
     final tiempo = item['tiempo'] as int;
     final comentario = item['comentario'] as String;
@@ -561,7 +611,11 @@ class _EditarRutaPageState extends State<EditarRutaPage> {
           children: [
             Text("Tiempo: $tiempo min"),
             if (comentario.isNotEmpty)
-              Text("Nota: $comentario", maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(
+                "Nota: $comentario",
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
           ],
         ),
         trailing: Row(
